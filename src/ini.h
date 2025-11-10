@@ -211,6 +211,26 @@ const char *ini_get_value(const INIData_t *data, const char *section, const char
 
 
 /*
+ * Attempt to fetch an string value from INI data given a
+ * section and key. If unfound, returns a provided default.
+ *
+ * Params:
+ *   data    - Pointer to the INIData_t object to search
+ *   section - The section title being searched for.
+ *   key     - The key being searched for.
+ *   default - Default value to be used if searched
+ *             value is not found or fails to be parsed.
+ *
+ * Returns:
+ *   As said above, returns the searched value or the provided
+ *   default if the searched value could not be found or parsing
+ *   failed.
+ */
+const char *ini_get_string(INIData_t *data, const char *section, const char *key, const char *default_value);
+
+
+
+/*
  * Attempt to fetch an unsigned integer value from INI data given a
  * section and key. If unfound, returns a provided default.
  *

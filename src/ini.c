@@ -119,6 +119,15 @@ INIData_t *ini_parse_file(FILE *file)
 
 
 
+static bool contains_spaces_(const char *str)
+{
+    while (*str++ != '\0')
+        if (*str == ' ') return true;
+    return false;
+}
+
+
+
 void ini_write_file(const INIData_t *data, FILE *file)
 {
     assert(data);
@@ -130,7 +139,12 @@ void ini_write_file(const INIData_t *data, FILE *file)
         const INISection_t *section = &data->sections[i];
         fprintf(file, "[%s]\n", section->name);
         for (int j = 0; j < section->pair_count; j++)
-            fprintf(file, "%s=%s\n", section->pairs[j].key, section->pairs[j].value);
+        {
+            if (contains_spaces_(section->pairs[j].value))
+                fprintf(file, "%s=\"%s\"\n", section->pairs[j].key, section->pairs[j].value);
+            else
+                fprintf(file, "%s=%s\n", section->pairs[j].key, section->pairs[j].value);
+        }
     }
 }
 
@@ -244,6 +258,15 @@ const char *ini_get_value(const INIData_t *data, const char *section, const char
     }
 
     return NULL;
+}
+
+
+
+const char *ini_get_string(INIData_t *data, const char *section, const char *key, const char *default_value)
+{
+    const char *str = ini_get_value(data, section, key);
+    if (!str) return default_value;
+    return str;
 }
 
 
@@ -462,13 +485,9 @@ bool ini_parse_pair(const char *line, INIPair_t *pair, ptrdiff_t *error_offset)
 
 
     // value
-    bool quoted = false;
-    if (*c == '"')
-    {
-        quoted = true;
-        if (dest_c) *dest_c++ = *c;
-        c++;
-    }
+    bool quoted = (*c == '"');
+    if (quoted) c++;
+
     while (is_valid_value_character_(*c, quoted))
     {
         if (dest_c)
@@ -478,12 +497,13 @@ bool ini_parse_pair(const char *line, INIPair_t *pair, ptrdiff_t *error_offset)
         }
         c++;
     }
+
     if (quoted)
     {
         if (*c != '"') goto is_not_pair;
-        if (dest_c) *dest_c++ = *c;
         c++;
     }
+
     if (dest_c) *dest_c = '\0';
     c = skip_ignored_characters_(c);
 

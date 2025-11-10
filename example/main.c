@@ -29,8 +29,9 @@ int main(void)
     for (int i = 0; i < iterations; i++)
         printf("%s, %s%c\n", greeting, subject, enthusiasm);
 
+    const char *pi_string = ini_get_string(ini, "Pi", "string", "pi =");
     float pi = ini_get_float(ini, "Pi", "pi", 3);
-    printf("Pi with a sufficient number of digits: %f\n", pi);
+    printf("%s %f\n", pi_string, pi);
 
     ini_free(ini);
 

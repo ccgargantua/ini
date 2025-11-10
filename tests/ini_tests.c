@@ -54,7 +54,7 @@ TEST(ini_tests, pairs)
 
     ASSERT_TRUE(ini_parse_pair(line_string, &pair, NULL));
     ASSERT_STREQ(pair.key, "key");
-    ASSERT_STREQ(pair.value, "\"this is a value\"");
+    ASSERT_STREQ(pair.value, "this is a value");
 }
 
 
@@ -169,8 +169,26 @@ TEST(ini_tests, file_parsing)
     ASSERT_STREQ(ini_get_value(data, "section", "hello"), "world");
     ASSERT_STREQ(ini_get_value(data, "section", "hi"), "true");
     ASSERT_STREQ(ini_get_value(data, "section", "val"), "5");
-    ASSERT_STREQ(ini_get_value(data, "section", "this_one"), "\"is a string\"");
+    ASSERT_STREQ(ini_get_value(data, "section", "this_one"), "is a string");
     ini_free(data);
+}
+
+
+
+TEST(ini_tests, get_string)
+{
+    const char contents[] = "[section]\n"
+                            "hello=world\n"
+                            "message=\"hello world\"\n";
+
+    FILE *file = tmpfile();
+    assert(file);
+    fputs(contents, file);
+    rewind(file);
+    INIData_t *data = ini_parse_file(file);
+    ASSERT_TRUE(data != NULL);
+    ASSERT_STREQ(ini_get_string(data, "section", "hello", ""), "world");
+    ASSERT_STREQ(ini_get_string(data, "section", "message", ""), "hello world");
 }
 
 
