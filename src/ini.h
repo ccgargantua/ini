@@ -9,6 +9,29 @@
 
 
 
+typedef struct INIPair_t    INIPair_t;
+typedef struct INISection_t INISection_t;
+typedef struct INIData_t    INIData_t;
+
+INIData_t         *ini_parse_file          (FILE*);
+void               ini_write_file          (const INIData_t*, FILE*);
+INISection_t      *ini_has_section         (const INIData_t*, const char*);
+void               ini_section_init        (const char*,      INISection_t*);
+INISection_t      *ini_add_section         (INIData_t*,       const char*);
+INIPair_t         *ini_add_pair            (INIData_t*,       const char*,   INIPair_t);
+INIPair_t         *ini_add_pair_to_section (INISection_t *,   INIPair_t );
+const char        *ini_get_value           (const INIData_t*, const char*,   const char*);
+unsigned long long ini_get_unsigned        (const INIData_t*, const char*,   const char*, unsigned long long);
+long long          ini_get_signed          (const INIData_t*, const char*,   const char*, long long);
+long double        ini_get_float           (const INIData_t*, const char*,   const char*, long double);
+bool               ini_get_bool            (const INIData_t*, const char*,   const char*, bool);
+void               ini_free                (INIData_t*);
+bool               ini_is_blank_line       (const char*);
+bool               ini_parse_pair          (const char*,      INIPair_t*,    ptrdiff_t*);
+bool               ini_parse_section       (const char*,      INISection_t*, ptrdiff_t*);
+
+
+
 #define INI_MAX_STRING_SIZE 256
 #define INI_MAX_LINE_SIZE 1024
 
@@ -17,11 +40,11 @@
 /*
  * Key=value pair
  */
-typedef struct
+struct INIPair_t
 {
     char key[INI_MAX_STRING_SIZE];
     char value[INI_MAX_STRING_SIZE];
-} INIPair_t;
+};
 
 
 
@@ -31,13 +54,13 @@ typedef struct
  * Keeps track of encapsulated pairs, the number of pairs,
  * and the number of allocated pairs.
  */
-typedef struct
+struct INISection_t
 {
     char name[INI_MAX_STRING_SIZE];
     INIPair_t *pairs;
     unsigned pair_count;
     unsigned pair_allocation;
-} INISection_t;
+};
 
 
 
@@ -45,7 +68,7 @@ typedef struct
  * Data structure for INI contents. Keeps track of
  * sections and the number of sections.
  */
-typedef struct
+struct INIData_t
 {
     struct {
         bool encountered;
@@ -56,7 +79,7 @@ typedef struct
     INISection_t *sections;
     unsigned section_count;
     unsigned section_allocation;
-} INIData_t;
+};
 
 
 
