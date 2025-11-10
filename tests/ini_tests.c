@@ -175,6 +175,71 @@ TEST(ini_tests, file_parsing)
 
 
 
+TEST(ini_tests, get_unsigned)
+{
+    const unsigned expected = 5;
+    FILE *file = tmpfile();
+    assert(file);
+    fprintf(file,"[section]\nval=%d", expected);
+    rewind(file);
+    INIData_t *data = ini_parse_file(file);
+    ASSERT_TRUE(data != NULL);
+    const unsigned result = ini_get_unsigned(data, "section", "val", 0);
+    ASSERT_EQ(result, expected);
+    ini_free(data);
+}
+
+
+
+TEST(ini_tests, get_signed)
+{
+    const int expected = -5;
+    FILE *file = tmpfile();
+    assert(file);
+    fprintf(file,"[section]\nval=%d", expected);
+    rewind(file);
+    INIData_t *data = ini_parse_file(file);
+    ASSERT_TRUE(data != NULL);
+    const int result = (int)ini_get_signed(data, "section", "val", 0);
+    ASSERT_EQ(result, expected);
+    ini_free(data);
+}
+
+
+
+TEST(ini_tests, get_float)
+{
+    const float expected = 5.5;
+    FILE *file = tmpfile();
+    assert(file);
+    fprintf(file,"[section]\nval=%f", expected);
+    rewind(file);
+    INIData_t *data = ini_parse_file(file);
+    ASSERT_TRUE(data != NULL);
+    const float result = (float)ini_get_float(data, "section", "val", 0);
+    ASSERT_FLOAT_EQ(result, expected);
+    ini_free(data);
+}
+
+
+
+TEST(ini_tests, get_bool)
+{
+    const bool expected = 5;
+    FILE *file = tmpfile();
+    assert(file);
+    fprintf(file,"[section]\nval=%s", (expected ? "true" : "false"));
+    rewind(file);
+    INIData_t *data = ini_parse_file(file);
+    ASSERT_TRUE(data != NULL);
+    const bool result = ini_get_bool(data, "section", "val", !expected);
+    ASSERT_EQ(result, expected);
+    ini_free(data);
+
+}
+
+
+
 TEST(ini_tests, file_writing)
 {
     const char contents[] = "[section]\n"
