@@ -13,6 +13,7 @@ int main(void)
     INIData_t *ini = ini_parse_file(file);
     if (ini->error.encountered)
         print_error(ini);
+    fclose(file);
 
     const char *greeting = ini_get_value(ini, "Text", "greeting");
     assert(greeting);
@@ -30,6 +31,8 @@ int main(void)
 
     float pi = ini_get_float(ini, "Pi", "pi", 3);
     printf("Pi with a sufficient number of digits: %f\n", pi);
+
+    ini_free(ini);
 
     return 0;
 }
