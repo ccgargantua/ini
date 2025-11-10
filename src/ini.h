@@ -30,10 +30,8 @@ bool               ini_is_blank_line       (const char*);
 bool               ini_parse_pair          (const char*,      INIPair_t*,    ptrdiff_t*);
 bool               ini_parse_section       (const char*,      INISection_t*, ptrdiff_t*);
 
-
-
 #define INI_MAX_STRING_SIZE 256
-#define INI_MAX_LINE_SIZE 1024
+#define INI_MAX_LINE_SIZE   1024
 
 
 
