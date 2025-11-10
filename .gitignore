@@ -1033,3 +1033,6 @@ dkms.conf
 *.uf2
 # Raspberry Pi Pico disassembler file
 *.dis
+
+example/Makefile
+example/prog
