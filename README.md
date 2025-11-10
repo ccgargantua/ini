@@ -1,6 +1,6 @@
 # ini
 
-A simple and small ini file parsing library.
+A simple and small ini file parsing library. Licensed under MIT.
 
 ## Including in your project
 
@@ -26,3 +26,4 @@ they fail, I'm going to immediately close your pull request.
 ## Accreditations
 
 - [rktest](https://github.com/Warwolt/rktest) by Rasmus Källqvist
+- [Yousha's .gitignore for C/C++ developers](https://gist.github.com/Yousha/3830712334ac30a90eb6041b932b68d7)
