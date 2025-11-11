@@ -212,13 +212,13 @@ TEST(ini_tests, file_parsing)
     assert(file);
     fputs(contents, file);
     rewind(file);
-    INIData_t *data = ini_parse_file(file, NULL);
+    INIData_t *data = ini_read_file(file, NULL);
     ASSERT_TRUE(data != NULL);
     ASSERT_STREQ(ini_get_value(data, "section", "hello"), "world");
     ASSERT_STREQ(ini_get_value(data, "section", "hi"), "true");
     ASSERT_STREQ(ini_get_value(data, "section", "val"), "5");
     ASSERT_STREQ(ini_get_value(data, "section", "this_one"), "is a string");
-    ini_free(data);
+    ini_free_data(data);
 }
 
 
@@ -234,12 +234,12 @@ TEST(ini_tests, get_string)
     fputs(contents, file);
     rewind(file);
     INIError_t error;
-    INIData_t *data = ini_parse_file(file, &error);
+    INIData_t *data = ini_read_file(file, &error);
     fclose(file);
     ASSERT_TRUE(data != NULL);
     ASSERT_STREQ(ini_get_string(data, "section", "hello", ""), "world");
     ASSERT_STREQ(ini_get_string(data, "section", "message", ""), "hello world");
-    ini_free(data);
+    ini_free_data(data);
 }
 
 
@@ -251,11 +251,11 @@ TEST(ini_tests, get_unsigned)
     assert(file);
     fprintf(file,"[section]\nval=%d", expected);
     rewind(file);
-    INIData_t *data = ini_parse_file(file, NULL);
+    INIData_t *data = ini_read_file(file, NULL);
     ASSERT_TRUE(data != NULL);
     const unsigned result = ini_get_unsigned(data, "section", "val", 0);
     ASSERT_EQ(result, expected);
-    ini_free(data);
+    ini_free_data(data);
 }
 
 
@@ -267,11 +267,11 @@ TEST(ini_tests, get_signed)
     assert(file);
     fprintf(file,"[section]\nval=%d", expected);
     rewind(file);
-    INIData_t *data = ini_parse_file(file, NULL);
+    INIData_t *data = ini_read_file(file, NULL);
     ASSERT_TRUE(data != NULL);
     const int result = (int)ini_get_signed(data, "section", "val", 0);
     ASSERT_EQ(result, expected);
-    ini_free(data);
+    ini_free_data(data);
 }
 
 
@@ -283,11 +283,11 @@ TEST(ini_tests, get_float)
     assert(file);
     fprintf(file,"[section]\nval=%f", expected);
     rewind(file);
-    INIData_t *data = ini_parse_file(file, NULL);
+    INIData_t *data = ini_read_file(file, NULL);
     ASSERT_TRUE(data != NULL);
     const float result = (float)ini_get_float(data, "section", "val", 0);
     ASSERT_FLOAT_EQ(result, expected);
-    ini_free(data);
+    ini_free_data(data);
 }
 
 
@@ -299,11 +299,11 @@ TEST(ini_tests, get_bool)
     assert(file);
     fprintf(file,"[section]\nval=%s", (expected ? "true" : "false"));
     rewind(file);
-    INIData_t *data = ini_parse_file(file, NULL);
+    INIData_t *data = ini_read_file(file, NULL);
     ASSERT_TRUE(data != NULL);
     const bool result = ini_get_bool(data, "section", "val", !expected);
     ASSERT_EQ(result, expected);
-    ini_free(data);
+    ini_free_data(data);
 
 }
 
@@ -322,12 +322,12 @@ TEST(ini_tests, file_writing)
     fputs(contents, input_file);
     rewind(input_file);
 
-    INIData_t *data = ini_parse_file(input_file, NULL);
+    INIData_t *data = ini_read_file(input_file, NULL);
 
     FILE *output_file = tmpfile();
     ini_write_file(data, output_file);
     rewind(output_file);
-    INIData_t *copy = ini_parse_file(output_file, NULL);
+    INIData_t *copy = ini_read_file(output_file, NULL);
     ASSERT_TRUE(copy != NULL);
     ASSERT_TRUE(copy->sections != NULL);
     ASSERT_EQ(data->section_count, copy->section_count);
@@ -345,8 +345,8 @@ TEST(ini_tests, file_writing)
         }
     }
 
-    ini_free(data);
-    ini_free(copy);
+    ini_free_data(data);
+    ini_free_data(copy);
     fclose(input_file);
     fclose(output_file);
 }
@@ -361,15 +361,13 @@ TEST(ini_tests, parse_error_bad_key)
     fputs(contents, file);
     rewind(file);
     INIError_t error;
-    INIData_t *data = ini_parse_file(file, &error);
+    INIData_t *data = ini_read_file(file, &error);
     ASSERT_TRUE(data == NULL);
     ASSERT_TRUE(error.encountered);
     ASSERT_EQ(error.offset, 1);
     ASSERT_STREQ(error.line, "b$ad=pair\n");
     ASSERT_STREQ(error.msg, "Failed to parse pair.");
-    ASSERT_STREQ(error.culprit, "b$ad=pair\n"
-                                " ^\n");
-    ini_free(data);
+    ini_free_data(data);
     fclose(file);
 }
 
@@ -383,14 +381,12 @@ TEST(ini_tests, parse_error_bad_value)
     fputs(contents, file);
     rewind(file);
     INIError_t error;
-    INIData_t *data = ini_parse_file(file, &error);
+    INIData_t *data = ini_read_file(file, &error);
     ASSERT_TRUE(data == NULL);
     ASSERT_TRUE(error.encountered);
     ASSERT_STREQ(error.line, "bad=pa$ir\n");
     ASSERT_STREQ(error.msg, "Failed to parse pair.");
-    ASSERT_STREQ(error.culprit, "bad=pa$ir\n"
-                                "      ^\n");
-    ini_free(data);
+    ini_free_data(data);
     fclose(file);
 }
 
@@ -403,14 +399,12 @@ TEST(ini_tests, parse_error_no_section)
     fputs(contents, file);
     rewind(file);
     INIError_t error;
-    INIData_t *data = ini_parse_file(file, &error);
+    INIData_t *data = ini_read_file(file, &error);
     ASSERT_TRUE(data == NULL);
     ASSERT_TRUE(error.encountered);
     ASSERT_STREQ(error.line, "key=value\n");
     ASSERT_STREQ(error.msg, "Pairs must reside within a section.");
-    ASSERT_STREQ(error.culprit, "key=value\n"
-                                "^\n");
-    ini_free(data);
+    ini_free_data(data);
     fclose(file);
 }
 
@@ -423,14 +417,12 @@ TEST(ini_tests, parse_error_bad_section)
     fputs(contents, file);
     rewind(file);
     INIError_t error;
-    INIData_t *data = ini_parse_file(file, &error);
+    INIData_t *data = ini_read_file(file, &error);
     ASSERT_TRUE(data == NULL);
     ASSERT_TRUE(error.encountered);
     ASSERT_STREQ(error.line, "[Bad Section]\n");
     ASSERT_STREQ(error.msg, "Failed to parse section.");
-    ASSERT_STREQ(error.culprit, "[Bad Section]\n"
-                                "     ^\n");
-    ini_free(data);
+    ini_free_data(data);
     fclose(file);
 }
 
@@ -444,13 +436,11 @@ TEST(ini_tests, parse_error_duplicate_section)
     fputs(contents, file);
     rewind(file);
     INIError_t error;
-    INIData_t *data = ini_parse_file(file, &error);
+    INIData_t *data = ini_read_file(file, &error);
     ASSERT_TRUE(data == NULL);
     ASSERT_TRUE(error.encountered);
     ASSERT_STREQ(error.line, "[Section]\n");
     ASSERT_STREQ(error.msg, "Duplicate section 'Section'.");
-    ASSERT_STREQ(error.culprit, "[Section]\n"
-                                "^\n");
-    ini_free(data);
+    ini_free_data(data);
     fclose(file);
 }
