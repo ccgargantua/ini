@@ -50,24 +50,38 @@ typedef struct INIError_t   INIError_t;
 
 /* Functions */
 
-INIData_t         *ini_parse_file          (FILE*, INIError_t*);
-void               ini_write_file          (const INIData_t*, FILE*);
-INISection_t      *ini_has_section         (const INIData_t*, const char*);
-INISection_t      *ini_add_section         (INIData_t*,       const char*);
-INIPair_t         *ini_add_pair            (INIData_t*,       const char*,   INIPair_t);
-INIPair_t         *ini_add_pair_to_section (INISection_t *,   INIPair_t);
-const char        *ini_get_value           (const INIData_t*, const char*,   const char*);
-const char        *ini_get_string          (INIData_t *,      const char*,   const char*, const char*);
-unsigned long long ini_get_unsigned        (const INIData_t*, const char*,   const char*, unsigned long long);
-long long          ini_get_signed          (const INIData_t*, const char*,   const char*, long long);
-long double        ini_get_float           (const INIData_t*, const char*,   const char*, long double);
-bool               ini_get_bool            (const INIData_t*, const char*,   const char*, bool);
-void               ini_free                (INIData_t*);
+// Internals
+void               ini_set_allocator       (void*(*)(size_t));
+void               ini_set_free            (void(*)(void*));
+void               ini_set_reallocator     (void*(*)(void*,    size_t));
+
+// File I/O
+INIData_t         *ini_read_file          (FILE*, INIError_t*);
+void               ini_write_file          (const INIData_t*,  FILE*);
+
+// Database insertion
+INISection_t      *ini_add_section         (INIData_t*,        const char*);
+INIPair_t         *ini_add_pair            (const INIData_t*,  const char*,   INIPair_t);
+INIPair_t         *ini_add_pair_to_section (INISection_t *,    INIPair_t);
+
+// Database query
+INISection_t      *ini_has_section         (const INIData_t*,  const char*);
+const char        *ini_get_value           (const INIData_t*,  const char*,   const char*);
+const char        *ini_get_string          (const INIData_t *, const char*,   const char*, const char*);
+unsigned long long ini_get_unsigned        (const INIData_t*,  const char*,   const char*, unsigned long long);
+long long          ini_get_signed          (const INIData_t*,  const char*,   const char*, long long);
+long double        ini_get_float           (const INIData_t*,  const char*,   const char*, long double);
+bool               ini_get_bool            (const INIData_t*,  const char*,   const char*, bool);
+
+// Parsing
 bool               ini_is_blank_line       (const char*);
-bool               ini_parse_section       (const char*,      INISection_t*, ptrdiff_t*);
-bool               ini_parse_pair          (const char*,      INIPair_t*,    ptrdiff_t*);
-bool               ini_parse_key           (const char*,      char*,         unsigned,    ptrdiff_t*);
-bool               ini_parse_value         (const char*,      char*,         unsigned,    ptrdiff_t*);
+bool               ini_parse_section       (const char*,       INISection_t*, ptrdiff_t*);
+bool               ini_parse_pair          (const char*,       INIPair_t*,    ptrdiff_t*);
+bool               ini_parse_key           (const char*,       char*,         unsigned,    ptrdiff_t*);
+bool               ini_parse_value         (const char*,       char*,         unsigned,    ptrdiff_t*);
+
+// Cleanup.
+void               ini_free_data           (INIData_t*);
 
 
 
@@ -76,6 +90,19 @@ bool               ini_parse_value         (const char*,      char*,         uns
 #define INI_MAX_STRING_SIZE 256
 #define INI_MAX_LINE_SIZE   1024
 
+
+
+// You can redefine these at compile time if you'd like to
+// avoid changing allocator functions at runtime.
+#ifndef INI_DEFAULT_ALLOC
+    #define INI_DEFAULT_ALLOC malloc
+#endif
+#ifndef INI_DEFAUT_FREE
+    #define INI_DEFAULT_FREE free
+#endif
+#ifndef INI_DEFAULT_REALLOC
+    #define INI_DEFAULT_REALLOC realloc
+#endif
 
 
 ////////////////////////
@@ -147,6 +174,8 @@ struct INIError_t
 
     // The culprit line
     char line[INI_MAX_LINE_SIZE];
+
+    // The offset of the invalid character if encountered.
     ptrdiff_t offset;
 };
 
@@ -155,6 +184,42 @@ struct INIError_t
 ///////////////////////////
 // Function Declarations //
 ///////////////////////////
+
+/*
+ *  Set the allocator to be used internally by ini. If you
+ *  set this, you almost *certainly* want to also set the
+ *  reallocator and deallocator.
+ *
+ *  Params:
+ *    allocator - malloc-like allocator
+ */
+void ini_set_allocator(void *(*allocator) (size_t));
+
+
+
+/*
+ *  Set the deallocator to be used internally by ini. If you
+ *  set this, you almost *certainly* want to also set the
+ *  reallocator and allocator.
+ *
+ *  Params:
+ *    deallocator - free-like deallocator
+ */
+void ini_set_free(void (*deallocator) (void*));
+
+
+
+/*
+ *  Set the reallocator to be used internally by ini. If you
+ *  set this, you almost *certainly* want to also set the
+ *  allocator and deallocator.
+ *
+ *  Params:
+ *    reallocator - realloc-like reallocator
+ */
+void ini_set_reallocator(void *(*reallocator) (void*,size_t));
+
+
 
 /*
  * Parse an ini file and populate a data structure
@@ -170,7 +235,7 @@ struct INIError_t
  *   A pointer to an INIData_t object. Object contains
  *   heap-allocated data. On failure, returns NULL.
  */
-INIData_t *ini_parse_file(FILE *file, INIError_t *error);
+INIData_t *ini_read_file(FILE *file, INIError_t *error);
 
 
 
@@ -184,21 +249,6 @@ INIData_t *ini_parse_file(FILE *file, INIError_t *error);
  *   file - Destination file pointer.
  */
 void ini_write_file(const INIData_t *data, FILE *file);
-
-
-
-/*
- * Query for a section object based on the section name.
- *
- * Params:
- *   data    - The INIData_t object that represents an INI file.
- *   section - The name of the section you are checking for.
- *
- * Returns:
- *   A pointer to the located INISection_t object, or NULL if
- *   the section is not found.
- */
-INISection_t *ini_has_section(const INIData_t *data, const char *section);
 
 
 
@@ -234,7 +284,7 @@ INISection_t *ini_add_section(INIData_t *data, const char *name);
  *   section within `data`, or NULL on failure (i.e., providing
  *   a name for a section that does not exist in `data`)
  */
-INIPair_t *ini_add_pair(INIData_t *data, const char *section, INIPair_t pair);
+INIPair_t *ini_add_pair(const INIData_t *data, const char *section, INIPair_t pair);
 
 
 
@@ -251,6 +301,21 @@ INIPair_t *ini_add_pair(INIData_t *data, const char *section, INIPair_t pair);
  *   A pointer to the newly-added pair within the section.
  */
 INIPair_t *ini_add_pair_to_section(INISection_t *section, INIPair_t pair);
+
+
+
+/*
+ * Query for a section object based on the section name.
+ *
+ * Params:
+ *   data    - The INIData_t object that represents an INI file.
+ *   section - The name of the section you are checking for.
+ *
+ * Returns:
+ *   A pointer to the located INISection_t object, or NULL if
+ *   the section is not found.
+ */
+INISection_t *ini_has_section(const INIData_t *data, const char *section);
 
 
 
@@ -287,7 +352,7 @@ const char *ini_get_value(const INIData_t *data, const char *section, const char
  *   default if the searched value could not be found or parsing
  *   failed.
  */
-const char *ini_get_string(INIData_t *data, const char *section, const char *key, const char *default_value);
+const char *ini_get_string(const INIData_t *data, const char *section, const char *key, const char *default_value);
 
 
 
@@ -368,18 +433,6 @@ long double ini_get_float(const INIData_t *data, const char *section, const char
  *   failed.
  */
 bool ini_get_bool(const INIData_t *data, const char *section, const char *key, bool default_value);
-
-
-
-/*
- * Free the memory resources used by an INIData_t object.
- * This should be called if you have created an INIData_t
- * object with ini_parse_file()
- *
- * Params:
- *   data - The INIData_t object to be free'd.
- */
-void ini_free(INIData_t *data);
 
 
 
@@ -492,6 +545,18 @@ bool ini_parse_key(const char *line, char *dest, unsigned n, ptrdiff_t *discrepa
  *   otherwise.
  */
 bool ini_parse_value(const char *line, char *dest, unsigned n, ptrdiff_t *discrepancy);
+
+
+
+/*
+ * Free the memory resources used by an INIData_t object.
+ * This should be called if you have created an INIData_t
+ * object with ini_parse_file()
+ *
+ * Params:
+ *   data - The INIData_t object to be free'd.
+ */
+void ini_free_data(INIData_t *data);
 
 
 
