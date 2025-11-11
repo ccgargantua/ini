@@ -3,16 +3,17 @@
 
 #include "../ini.h"
 
-void print_error(INIData_t *ini);
+void print_error(INIError_t *error);
 
 int main(void)
 {
-    FILE *file = fopen("example.ini", "r");
+    FILE *file = fopen("example/example.ini", "r");
     assert(file);
 
-    INIData_t *ini = ini_parse_file(file);
-    if (ini->error.encountered)
-        print_error(ini);
+    INIError_t error;
+    INIData_t *ini = ini_parse_file(file, &error);
+    if (error.encountered)
+        print_error(&error);
     fclose(file);
 
     const char *greeting = ini_get_value(ini, "Text", "greeting");
@@ -38,13 +39,13 @@ int main(void)
     return 0;
 }
 
-void print_error(INIData_t *ini)
+void print_error(INIError_t *error)
 {
-    char buffer[ini->error.offset+1];
+    char buffer[error->offset+1];
     int i = 0;
-    for (i = 0; i < ini->error.offset; i++)
+    for (i = 0; i < error->offset; i++)
         buffer[i] = ' ';
     buffer[i++] = '^';
     buffer[i] = '\0';
-    printf("%s\n%s\n%s\n", ini->error.msg, ini->error.line, buffer);
+    printf("%s\n%s\n%s\n", error->msg, error->line, buffer);
 }
