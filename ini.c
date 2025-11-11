@@ -1,3 +1,29 @@
+/*
+ *   MIT License
+ *
+ *   Copyright (c) 2025 Carter Dugan
+ *
+ *   Permission is hereby granted, free of charge, to any person obtaining a copy
+ *   of this software and associated documentation files (the "Software"), to deal
+ *   in the Software without restriction, including without limitation the rights
+ *   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *   copies of the Software, and to permit persons to whom the Software is
+ *   furnished to do so, subject to the following conditions:
+ *
+ *   The above copyright notice and this permission notice shall be included in all
+ *   copies or substantial portions of the Software.
+ *
+ *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ *   SOFTWARE.
+ */
+
+
+
 #include "ini.h"
 
 
@@ -15,52 +41,63 @@
 
 
 
-static void set_parse_error_(INIData_t *data, const char *line, const char *msg)
+static void set_parse_error_(INIError_t *error, const char *line, ptrdiff_t offset, const char *msg)
 {
-    assert(data);
-    if (!data || data->error.offset < 0) return;
+    if (!error || offset < 0) return;
 
-    data->error.encountered = true;
-    memset(data->error.line, 0, sizeof(data->error.line));
-    strncpy(data->error.line, line, strnlen(line, INI_MAX_LINE_SIZE));
-    memset(data->error.msg, 0, sizeof(data->error.msg));
-    strncpy(data->error.msg, msg, strnlen(msg, INI_MAX_LINE_SIZE));
-}
+    error->encountered = true;
+    error->offset = offset;
 
+    strncpy(error->msg, msg, strnlen(msg, INI_MAX_LINE_SIZE));
 
+    int culprit_line_length = strnlen(line, INI_MAX_LINE_SIZE);
+    strncpy(error->line, line, culprit_line_length);
 
-static void free_data_sections_(INIData_t *data)
-{
-    if (data)
+    for (int i = 0; i < culprit_line_length; i++)
     {
-        if (data->sections)
-        {
-            for (int i = 0; i < data->section_count; i++)
-                if (data->sections[i].pairs)
-                    free(data->sections[i].pairs);
-            free(data->sections);
-        }
-        data->sections = NULL;
+        error->culprit[i] = line[i];
+        if (i < offset)
+            error->culprit[i + culprit_line_length] = ' ';
+        else if (i == offset)
+            error->culprit[i + culprit_line_length] = '^';
     }
+    error->culprit[culprit_line_length + offset + 1] = '\n';
+    error->culprit[culprit_line_length + offset + 2] = '\0';
 }
 
 
 
+static void clear_parse_error_(INIError_t *error)
+{
+    if (!error) return;
+    error->encountered = false;
+    memset(error->line, 0, sizeof(error->line));
+    memset(error->msg, 0, sizeof(error->msg));
+    memset(error->culprit, 0, sizeof(error->culprit));
+    error->offset = 0;
+}
 
-INIData_t *ini_parse_file(FILE *file)
+
+
+static void init_data_(INIData_t *data)
+{
+    if (!data) return;
+    data->section_count = 0;
+    data->section_allocation = INITIAL_ALLOCATED_SECTIONS;
+    data->sections = malloc(sizeof(INISection_t) * data->section_allocation);
+}
+
+
+
+INIData_t *ini_parse_file(FILE *file, INIError_t *error)
 {
     if (!file) return NULL;
+    clear_parse_error_(error);
 
     INIData_t *data = malloc(sizeof(INIData_t));
     assert(data);
     if (!data) return NULL;
-
-    data->error.encountered = false;
-    memset(data->error.line, 0, sizeof(data->error.line));
-    data->error.offset = 0;
-    data->section_count = 0;
-    data->section_allocation = INITIAL_ALLOCATED_SECTIONS;
-    data->sections = malloc(sizeof(INISection_t) * data->section_allocation);
+    init_data_(data);
 
     char line[INI_MAX_LINE_SIZE];
     INISection_t *current_section = NULL;
@@ -69,13 +106,15 @@ INIData_t *ini_parse_file(FILE *file)
         // Blank line?
         if (ini_is_blank_line(line)) continue;
 
+        ptrdiff_t discrepency_offset = 0;
+
         // Pair?
         INIPair_t pair;
-        if (ini_parse_pair(line, &pair, &data->error.offset))
+        if (ini_parse_pair(line, &pair, &discrepency_offset))
         {
             if (!current_section)
             {
-                set_parse_error_(data, line, "Pairs must reside within a section.");
+                set_parse_error_(error, line, discrepency_offset, "Pairs must reside within a section.");
                 goto parse_failure;
             }
             ini_add_pair_to_section(current_section, pair);
@@ -83,22 +122,22 @@ INIData_t *ini_parse_file(FILE *file)
         }
 
         // It's not a pair... is it a section?
-        if (line[data->error.offset] != '[')
+        if (line[discrepency_offset] != '[')
         {
-            set_parse_error_(data, line, "Failed to parse pair.");
+            set_parse_error_(error, line, discrepency_offset, "Failed to parse pair.");
             goto parse_failure;
         }
 
         // It's a section... but is it valid?
         INISection_t dest_section;
-        if (ini_parse_section(line, &dest_section, &data->error.offset))
+        if (ini_parse_section(line, &dest_section, &discrepency_offset))
         {
             const INISection_t *existing_section = ini_has_section(data, dest_section.name);
             if (existing_section)
             {
                 char buffer[INI_MAX_LINE_SIZE];
                 snprintf(buffer, INI_MAX_LINE_SIZE, "Duplicate section '%s'.", dest_section.name);
-                set_parse_error_(data, line, buffer);
+                set_parse_error_(error, line, discrepency_offset, buffer);
                 goto parse_failure;
             }
             current_section = ini_add_section(data, dest_section.name);
@@ -106,15 +145,17 @@ INIData_t *ini_parse_file(FILE *file)
         }
 
         // It's not a valid section
-        set_parse_error_(data, line, "Failed to parse section.");
+        set_parse_error_(error, line, discrepency_offset, "Failed to parse section.");
         goto parse_failure;
     }
-    return data;
 
+    goto done;
     parse_failure:
-    free_data_sections_(data);
-    return data;
+    ini_free(data);
+    return NULL;
 
+    done:
+    return data;
 }
 
 
@@ -134,11 +175,11 @@ void ini_write_file(const INIData_t *data, FILE *file)
     assert(file);
     if (!data || !file) return;
 
-    for (int i = 0; i < data->section_count; i++)
+    for (unsigned i = 0; i < data->section_count; i++)
     {
         const INISection_t *section = &data->sections[i];
         fprintf(file, "[%s]\n", section->name);
-        for (int j = 0; j < section->pair_count; j++)
+        for (unsigned j = 0; j < section->pair_count; j++)
         {
             if (contains_spaces_(section->pairs[j].value))
                 fprintf(file, "%s=\"%s\"\n", section->pairs[j].key, section->pairs[j].value);
@@ -158,7 +199,7 @@ INISection_t *ini_has_section(const INIData_t *data, const char *section)
     if (cached && cached_data)
         if (data == cached_data && strncmp(section, cached->name, INI_MAX_STRING_SIZE) == 0)
             return cached;
-    for (int i = 0; i < data->section_count; i++)
+    for (unsigned i = 0; i < data->section_count; i++)
         if (strncmp(section, data->sections[i].name, INI_MAX_STRING_SIZE) == 0)
         {
             cached = &data->sections[i];
@@ -240,7 +281,7 @@ const char *ini_get_value(const INIData_t *data, const char *section, const char
     if (!data || !section || !key || !data->sections) return NULL;
 
     INISection_t *found_section = NULL;
-    for (int i = 0; i < data->section_count; i++)
+    for (unsigned i = 0; i < data->section_count; i++)
     {
         if (strncmp(data->sections[i].name, section, INI_MAX_STRING_SIZE) == 0)
         {
@@ -251,7 +292,7 @@ const char *ini_get_value(const INIData_t *data, const char *section, const char
 
     if (!found_section) return NULL;
 
-    for (int i = 0; i < found_section->pair_count; i++)
+    for (unsigned i = 0; i < found_section->pair_count; i++)
     {
         if (strncmp(found_section->pairs[i].key, key, INI_MAX_STRING_SIZE) == 0)
             return found_section->pairs[i].value;
@@ -323,9 +364,17 @@ bool ini_get_bool(const INIData_t *data, const char *section, const char *key, b
 
 void ini_free(INIData_t *data)
 {
-    if (!data) return;
-    free_data_sections_(data);
-    free(data);
+    if (data)
+    {
+        if (data->sections)
+        {
+            for (unsigned i = 0; i < data->section_count; i++)
+                if (data->sections[i].pairs)
+                    free(data->sections[i].pairs);
+            free(data->sections);
+        }
+        free(data);
+    }
 }
 
 
@@ -363,14 +412,13 @@ static bool is_valid_section_character_(const char c)
 
 
 
-// Assumes line is null-terminated.
-bool ini_parse_section(const char *line, INISection_t *section, ptrdiff_t *error_offset)
+bool ini_parse_section(const char *line, INISection_t *section, ptrdiff_t *discrepancy)
 {
     assert(line);
     if (!line) return false;
 
     const char *c = line;
-    if (error_offset) *error_offset = 0;
+    if (discrepancy) *discrepancy = 0;
 
     char *dest_c = NULL;
     if (section)
@@ -407,7 +455,7 @@ bool ini_parse_section(const char *line, INISection_t *section, ptrdiff_t *error
     return true;
 
     is_not_section:
-    if (error_offset) *error_offset = c - line;
+    if (discrepancy) *discrepancy = c - line;
     if (section)
         section->name[0] = '\0';
     return false;
@@ -441,79 +489,105 @@ static bool is_valid_value_character_(const char c, const bool quoted)
 
 
 
-// Assumes line is null-terminated.
-bool ini_parse_pair(const char *line, INIPair_t *pair, ptrdiff_t *error_offset)
+bool ini_parse_key(const char *line, char *dest, unsigned n, ptrdiff_t *discrepancy)
 {
-    assert(line);
-    if (!line) return false;
+    if (discrepancy) *discrepancy = 0;
 
-    if (error_offset) *error_offset = 0;
     const char *c = line;
-    char *dest_c = NULL;
-
-    if (pair)
-    {
-        memset(pair->key, 0, sizeof(pair->key));
-        dest_c = pair->key;
-    }
     c = skip_ignored_characters_(c);
+    const char *beginning = c;
+    if (!is_valid_key_starting_value_(*beginning)) goto is_not_key;
 
-
-    // Key
-    if (!is_valid_key_starting_value_(*c)) goto is_not_pair;
     while (is_valid_key_character_(*c))
     {
-        if (dest_c)
+        if (dest)
         {
-            if (dest_c - pair->key >= INI_MAX_STRING_SIZE) return false;
-            *dest_c++ = *c;
+            if (dest - beginning >= n) goto is_not_key;
+            *dest++ = *c;
         }
         c++;
     }
-    if (dest_c) *dest_c = '\0';
+    if (dest) *dest = '\0';
 
     c = skip_ignored_characters_(c);
-    if (*c != '=') goto is_not_pair;
+    if (*c == '=') return true;
+
+    is_not_key:
+    if (discrepancy) *discrepancy = c - line;
+    return false;
+}
+
+
+
+bool ini_parse_value(const char *line, char *dest, unsigned n, ptrdiff_t *discrepancy)
+{
+    if (discrepancy) *discrepancy = 0;
+
+    const char *c = line;
+
+    while (*c != '\0' && *c != '=') c++;
+    if (*c != '=') goto is_not_value;
     c++;
+
     c = skip_ignored_characters_(c);
+    const char *beginning = c;
 
-    if (pair)
-    {
-        memset(pair->value, 0, sizeof(pair->value));
-        dest_c = pair->value;
-    }
-
-
-    // value
-    bool quoted = (*c == '"');
+    const bool quoted = (*c == '"');
     if (quoted) c++;
 
     while (is_valid_value_character_(*c, quoted))
     {
-        if (dest_c)
+        if (dest)
         {
-            if (dest_c - pair->value >= INI_MAX_STRING_SIZE) return false;
-            *dest_c++ = *c;
+            if (dest - beginning >= n) goto is_not_value;;
+            *dest++ = *c;
         }
         c++;
     }
 
     if (quoted)
     {
-        if (*c != '"') goto is_not_pair;
+        if (*c != '"') goto is_not_value;
         c++;
     }
 
-    if (dest_c) *dest_c = '\0';
-    c = skip_ignored_characters_(c);
+    if (dest) *dest = '\0';
 
-    if (*c != '\0')
-        goto is_not_pair;
+    c = skip_ignored_characters_(c);
+    if (*c == '\0') return true;
+
+    is_not_value:
+    if (discrepancy) *discrepancy = c - line;
+    return false;
+}
+
+
+
+bool ini_parse_pair(const char *line, INIPair_t *pair, ptrdiff_t *discrepancy)
+{
+    assert(line);
+    if (!line) return false;
+
+    if (discrepancy) *discrepancy = 0;
+
+    if (pair)
+        memset(pair->key, 0, sizeof(pair->key));
+
+    char key[INI_MAX_STRING_SIZE];
+    if (!ini_parse_key(line, key, INI_MAX_STRING_SIZE, discrepancy)) goto is_not_pair;
+
+    char value[INI_MAX_STRING_SIZE];
+    if (!ini_parse_value(line, value, INI_MAX_STRING_SIZE, discrepancy)) goto is_not_pair;
+
+    if (pair)
+    {
+        memcpy(pair->key, key, INI_MAX_STRING_SIZE);
+        memcpy(pair->value, value, INI_MAX_STRING_SIZE);
+    }
 
     return true;
 
     is_not_pair:
-    if (error_offset) *error_offset = c - line;
     if (pair)
     {
         pair->key[0] = '\0';

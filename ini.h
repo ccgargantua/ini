@@ -3,17 +3,54 @@
 
 
 
+/*
+ *   MIT License
+ *
+ *   Copyright (c) 2025 Carter Dugan
+ *
+ *   Permission is hereby granted, free of charge, to any person obtaining a copy
+ *   of this software and associated documentation files (the "Software"), to deal
+ *   in the Software without restriction, including without limitation the rights
+ *   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *   copies of the Software, and to permit persons to whom the Software is
+ *   furnished to do so, subject to the following conditions:
+ *
+ *   The above copyright notice and this permission notice shall be included in all
+ *   copies or substantial portions of the Software.
+ *
+ *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ *   SOFTWARE.
+ */
+
+
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 
 
 
+//////////////////////////
+// Forward Declarations //
+//////////////////////////
+
+/* Structs */
+
 typedef struct INIPair_t    INIPair_t;
 typedef struct INISection_t INISection_t;
 typedef struct INIData_t    INIData_t;
+typedef struct INIError_t   INIError_t;
 
-INIData_t         *ini_parse_file          (FILE*);
+
+
+/* Functions */
+
+INIData_t         *ini_parse_file          (FILE*, INIError_t*);
 void               ini_write_file          (const INIData_t*, FILE*);
 INISection_t      *ini_has_section         (const INIData_t*, const char*);
 void               ini_section_init        (const char*,      INISection_t*);
@@ -29,11 +66,21 @@ void               ini_free                (INIData_t*);
 bool               ini_is_blank_line       (const char*);
 bool               ini_parse_pair          (const char*,      INIPair_t*,    ptrdiff_t*);
 bool               ini_parse_section       (const char*,      INISection_t*, ptrdiff_t*);
+bool               ini_parse_key           (const char*,      char*,         unsigned,    ptrdiff_t*);
+bool               ini_parse_value         (const char*,      char*,         unsigned,    ptrdiff_t*);
+
+
+
+/* Macros */
 
 #define INI_MAX_STRING_SIZE 256
 #define INI_MAX_LINE_SIZE   1024
 
 
+
+////////////////////////
+// Struct Definitions //
+////////////////////////
 
 /*
  * Key=value pair
@@ -68,18 +115,28 @@ struct INISection_t
  */
 struct INIData_t
 {
-    struct {
-        bool encountered;
-        char msg[INI_MAX_LINE_SIZE];
-        char line[INI_MAX_LINE_SIZE];
-        ptrdiff_t offset;
-    } error;
     INISection_t *sections;
     unsigned section_count;
     unsigned section_allocation;
 };
 
 
+
+// TODO document
+struct INIError_t
+{
+    bool encountered;
+    char msg[INI_MAX_LINE_SIZE];
+    char line[INI_MAX_LINE_SIZE];
+    char culprit[INI_MAX_LINE_SIZE * 2 + 4]; // two lines, two newlines, two nulls
+    ptrdiff_t offset;
+};
+
+
+
+///////////////////////////
+// Function Declarations //
+///////////////////////////
 
 /*
  * Parse an ini file and populate a data structure
@@ -93,9 +150,9 @@ struct INIData_t
  *
  * Returns:
  *   A pointer to an INIData_t object. Object contains
- *   heap-allocated data.
+ *   heap-allocated data. On failure, returns NULL.
  */
-INIData_t *ini_parse_file(FILE *file);
+INIData_t *ini_parse_file(FILE *file, INIError_t *error);
 
 
 
@@ -337,30 +394,6 @@ bool ini_is_blank_line(const char *line);
 
 
 /*
- * A helper function that reads a character array and
- * attempts to parse a valid pair.
- *
- * Params:
- *   line         - The character array to be parsed.
- *   pair         - A pointer to a destination pair to store
- *                  key and value strings. If NULL is provided,
- *                  has no effect. If a string is not a valid
- *                  pair, then the key and value strings are
- *                  zero-length and null-terminated.
- *   error_offset - A pointer to an integer representing the
- *                  offset of the erroneous character if
- *                  present. If no error found, will be given
- *                  0. If NULL, has no effect.
- *
- * Returns:
- *   True if the line is considered a legal k=v pair,
- *   false otherwise.
- */
-bool ini_parse_pair(const char *line, INIPair_t *pair, ptrdiff_t *error_offset);
-
-
-
-/*
  * A helper function that parses a character array and
  * attempts to parse a valid section.
  *
@@ -371,17 +404,88 @@ bool ini_parse_pair(const char *line, INIPair_t *pair, ptrdiff_t *error_offset);
  *                  has no effect. If a string is not a valid
  *                  section, then the name string is zero-length
  *                  and null-terminated.
- *   error_offset - A pointer to an integer representing the
+ *   discrepancy  - A pointer to an integer representing the
  *                  offset of the erroneous character if
  *                  present. If no error found, will be given
  *                  0. If NULL, has no effect.
  *
  * Returns:
- *   True if the line is considered a leval section,
+ *   True if the line is considered a valid section,
  *   false otherwise.
  */
-bool ini_parse_section(const char *line, INISection_t *section, ptrdiff_t *error_offset);
+bool ini_parse_section(const char *line, INISection_t *section, ptrdiff_t *discrepancy);
 
+
+
+/*
+ * A helper function that parses a character array and
+ * attempts to parse a valid key.
+ *
+ * Params:
+ *   line         - The character array to be parsed.
+ *   dest         - A pointer to a destination buffer to
+ *                  store key string. If NULL is provided,
+ *                  has no effect. If a string is not a valid
+ *                  section, then the string is invalid and
+ *                  not guaranteed to be null-terminated.
+ *   discrepancy  - A pointer to an integer representing the
+ *                  offset of the erroneous character if
+ *                  present. If no error found, will be given
+ *                  0. If NULL, has no effect.
+ *
+ * Returns:
+ *   True if the line is considered a valid key, false
+ *   otherwise.
+ */
+bool ini_parse_key(const char *line, char *dest, unsigned n, ptrdiff_t *discrepancy);
+
+
+
+/*
+ * A helper function that parses a character array and
+ * attempts to parse a valid value.
+ *
+ * Params:
+ *   line         - The character array to be parsed.
+ *   dest         - A pointer to a destination buffer to
+ *                  store value string. If NULL is provided,
+ *                  has no effect. If a string is not a valid
+ *                  section, then the string is invalid and
+ *                  not guaranteed to be null-terminated.
+ *   discrepancy  - A pointer to an integer representing the
+ *                  offset of the erroneous character if
+ *                  present. If no error found, will be given
+ *                  0. If NULL, has no effect.
+ *
+ * Returns:
+ *   True if the line is considered a valid value, false
+ *   otherwise.
+ */
+bool ini_parse_value(const char *line, char *dest, unsigned n, ptrdiff_t *discrepancy);
+
+
+
+/*
+ * A helper function that reads a character array and
+ * attempts to parse a valid pair.
+ *
+ * Params:
+ *   line         - The character array to be parsed.
+ *   pair         - A pointer to a destination pair to store
+ *                  key and value strings. If NULL is provided,
+ *                  has no effect. If a string is not a valid
+ *                  pair, then the key and value strings are
+ *                  zero-length and null-terminated.
+ *   discrepancy  - A pointer to an integer representing the
+ *                  offset of the erroneous character if
+ *                  present. If no error found, will be given
+ *                  0. If NULL, has no effect.
+ *
+ * Returns:
+ *   True if the line is considered a legal k=v pair,
+ *   false otherwise.
+ */
+bool ini_parse_pair(const char *line, INIPair_t *pair, ptrdiff_t *discrepancy );
 
 
 #endif //INI_H
