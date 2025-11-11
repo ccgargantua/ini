@@ -44,7 +44,7 @@
 
 static void *(*ini_malloc_) (size_t) = INI_DEFAULT_ALLOC;
 static void (*ini_free_) (void *) = INI_DEFAULT_FREE;
-static void *(*ini_realloc_) (void *, size_t);
+static void *(*ini_realloc_) (void *, size_t) = INI_DEFAULT_REALLOC;
 
 
 

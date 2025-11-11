@@ -11,7 +11,7 @@ int main(void)
     assert(file);
 
     INIError_t error;
-    INIData_t *ini = ini_parse_file(file, &error);
+    INIData_t *ini = ini_read_file(file, &error);
     if (error.encountered)
         print_error(&error);
     fclose(file);
@@ -34,7 +34,7 @@ int main(void)
     float pi = ini_get_float(ini, "Pi", "pi", 3);
     printf("%s %f\n", pi_string, pi);
 
-    ini_free(ini);
+    ini_free_data(ini);
 
     return 0;
 }
