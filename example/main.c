@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-#include "../src/ini.h"
+#include "../ini.h"
 
 void print_error(INIData_t *ini);
 

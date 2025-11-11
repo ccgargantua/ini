@@ -6,8 +6,8 @@ set(CMAKE_C_STANDARD 11)
 option(INI_TEST "Enable INI testing mode" OFF)
 
 add_library(ini STATIC
-        src/ini.c
-        src/ini.h)
+        ini.c
+        ini.h)
 target_include_directories(ini PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 if(INI_TEST)

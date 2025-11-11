@@ -1,5 +1,5 @@
 #include "rktest.h"
-#include "ini.h"
+#include "../ini.h"
 
 
 
