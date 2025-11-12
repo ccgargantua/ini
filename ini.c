@@ -90,7 +90,6 @@ INIData_t *ini_read_file(FILE *file, INIError_t *error)
     clear_parse_error_(error);
 
     INIData_t *data = ini_malloc_(sizeof(INIData_t));
-    assert(data);
     if (!data) return NULL;
     init_data_(data);
 
@@ -157,8 +156,6 @@ INIData_t *ini_read_file(FILE *file, INIError_t *error)
 
 void ini_write_file(const INIData_t *data, FILE *file)
 {
-    assert(data);
-    assert(file);
     if (!data || !file) return;
 
     for (unsigned i = 0; i < data->section_count; i++)
@@ -185,7 +182,7 @@ INISection_t *ini_add_section(INIData_t *data, const char *name)
     {
         data->section_allocation *= 2;
         INISection_t *re = ini_realloc_(data->sections, sizeof(INISection_t) * data->section_allocation);
-        if (!re) return NULL;
+        assert(re);
         data->sections = re;
     }
     INISection_t *section = &data->sections[data->section_count++];
@@ -206,15 +203,13 @@ INIPair_t *ini_add_pair(const INIData_t *data, const char *section, const INIPai
 
 INIPair_t *ini_add_pair_to_section(INISection_t *section, const INIPair_t pair)
 {
-    assert(section);
     if (!section) return NULL;
 
     if (section->pair_count >= section->pair_allocation)
     {
         section->pair_allocation *= 2;
         INIPair_t *re = ini_realloc_(section->pairs, sizeof(INIPair_t) * section->pair_allocation);
-        if (!re)
-            return NULL;
+        assert(re);
         section->pairs = re;
     }
 
@@ -246,11 +241,6 @@ INISection_t *ini_has_section(const INIData_t *data, const char *section)
 
 const char *ini_get_value(const INIData_t *data, const char *section, const char *key)
 {
-    assert(data);
-    assert(data->sections);
-    assert(section);
-    assert(key);
-
     if (!data || !section || !key || !data->sections) return NULL;
 
     INISection_t *found_section = NULL;
@@ -346,7 +336,6 @@ bool ini_is_blank_line(const char *line)
 
 bool ini_parse_section(const char *line, INISection_t *section, ptrdiff_t *discrepancy)
 {
-    assert(line);
     if (!line) return false;
 
     const char *c = line;
@@ -397,7 +386,6 @@ bool ini_parse_section(const char *line, INISection_t *section, ptrdiff_t *discr
 
 bool ini_parse_pair(const char *line, INIPair_t *pair, ptrdiff_t *discrepancy)
 {
-    assert(line);
     if (!line) return false;
 
     if (discrepancy) *discrepancy = 0;
@@ -566,7 +554,6 @@ static bool contains_spaces_(const char *str)
 
 static void section_init_(const char *name, INISection_t *section)
 {
-    assert(section);
     if (!section) return;
     memset(section->name, 0, INI_MAX_STRING_SIZE);
     strncpy(section->name, name, INI_MAX_STRING_SIZE - 1);
