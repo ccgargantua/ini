@@ -51,12 +51,13 @@ typedef struct INIError_t   INIError_t;
 /* Functions */
 
 // Internals
+void               ini_disable_heap        (void);
 void               ini_set_allocator       (void*(*)(size_t));
 void               ini_set_free            (void(*)(void*));
 void               ini_set_reallocator     (void*(*)(void*,    size_t));
 
 // File I/O
-INIData_t         *ini_read_file          (FILE*, INIError_t*);
+INIData_t         *ini_read_file           (FILE*,             INIData_t*,    INIError_t*);
 void               ini_write_file          (const INIData_t*,  FILE*);
 
 // Database insertion
@@ -80,7 +81,8 @@ bool               ini_parse_pair          (const char*,       INIPair_t*,    pt
 bool               ini_parse_key           (const char*,       char*,         unsigned,    ptrdiff_t*);
 bool               ini_parse_value         (const char*,       char*,         unsigned,    ptrdiff_t*);
 
-// Cleanup.
+// Heap
+INIData_t         *ini_create_data         (void);
 void               ini_free_data           (INIData_t*);
 
 
@@ -94,6 +96,7 @@ void               ini_free_data           (INIData_t*);
 
 // You can redefine these at compile time if you'd like to
 // avoid changing allocator functions at runtime.
+
 #ifndef INI_DEFAULT_ALLOC
     #define INI_DEFAULT_ALLOC malloc
 #endif
@@ -186,6 +189,19 @@ struct INIError_t
 ///////////////////////////
 
 /*
+ *  Disable internal calls to heap allocation functions,
+ *  which by default are malloc, realloc, and free. If
+ *  you use this, then all attempted heap calls are
+ *  treated as failures and must be handled accordingly.
+ *
+ *  See examples/stack/ to see an example of using the library
+ *  without the heap.
+ */
+void ini_disable_heap(void);
+
+
+
+/*
  *  Set the allocator to be used internally by ini. If you
  *  set this, you almost *certainly* want to also set the
  *  reallocator and deallocator.
@@ -228,14 +244,15 @@ void ini_set_reallocator(void *(*reallocator) (void*,size_t));
  *
  * Params:
  *   file   - File to parse
+ *   data   - The database object to be filled with ini
+ *            contents.
  *   buffer - Line buffer to store erroneous line. Must be
  *
  *
  * Returns:
- *   A pointer to an INIData_t object. Object contains
- *   heap-allocated data. On failure, returns NULL.
+ *   A pointer to data on success, or NULL on failure.
  */
-INIData_t *ini_read_file(FILE *file, INIError_t *error);
+INIData_t *ini_read_file(FILE *file, INIData_t *data, INIError_t *error);
 
 
 
@@ -549,9 +566,20 @@ bool ini_parse_value(const char *line, char *dest, unsigned n, ptrdiff_t *discre
 
 
 /*
+ * Create a heap-allocated INIData_t database object.
+ *
+ * Returns:
+ *   Pointer to INIData_t object that must be free'd later
+ *   with a call to ini_free_data()
+ */
+INIData_t *ini_create_data();
+
+
+
+/*
  * Free the memory resources used by an INIData_t object.
  * This should be called if you have created an INIData_t
- * object with ini_parse_file()
+ * object with ini_create_data()
  *
  * Params:
  *   data - The INIData_t object to be free'd.

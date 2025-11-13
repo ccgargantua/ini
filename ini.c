@@ -50,7 +50,6 @@ static void *(*ini_realloc_) (void *, size_t) = INI_DEFAULT_REALLOC;
 // Static helpers
 static void set_parse_error_(INIError_t *error, const char *line, ptrdiff_t offset, const char *msg);
 static void clear_parse_error_(INIError_t *error);
-static void init_data_(INIData_t *data);
 static bool contains_spaces_(const char *str);
 static void section_init_(const char *name, INISection_t *section);
 static const char *skip_ignored_characters_(const char *c);
@@ -59,6 +58,15 @@ static bool is_valid_section_character_(char c);
 static bool is_valid_key_starting_value_(char c);
 static bool is_valid_key_character_(char c);
 static bool is_valid_value_character_(char c, bool quoted);
+
+
+
+void ini_disable_heap()
+{
+    ini_malloc_  = NULL;
+    ini_free_    = NULL;
+    ini_realloc_ = NULL;
+}
 
 
 
@@ -83,14 +91,10 @@ void ini_set_reallocator(void *(*reallocator) (void *,size_t))
 
 
 
-INIData_t *ini_read_file(FILE *file, INIError_t *error)
+INIData_t *ini_read_file(FILE *file, INIData_t *data, INIError_t *error)
 {
-    if (!file) return NULL;
+    if (!file || !data) return NULL;
     clear_parse_error_(error);
-
-    INIData_t *data = ini_malloc_(sizeof(INIData_t));
-    if (!data) return NULL;
-    init_data_(data);
 
     char line[INI_MAX_LINE_SIZE];
     INISection_t *current_section = NULL;
@@ -108,7 +112,7 @@ INIData_t *ini_read_file(FILE *file, INIError_t *error)
             if (!current_section)
             {
                 set_parse_error_(error, line, discrepancy_offset, "Pairs must reside within a section.");
-                goto parse_failure;
+                return NULL;
             }
             ini_add_pair_to_section(current_section, pair);
             continue;
@@ -118,7 +122,7 @@ INIData_t *ini_read_file(FILE *file, INIError_t *error)
         if (line[discrepancy_offset] != '[')
         {
             set_parse_error_(error, line, discrepancy_offset, "Failed to parse pair.");
-            goto parse_failure;
+            return NULL;
         }
 
         // It's a section... but is it valid?
@@ -131,7 +135,7 @@ INIData_t *ini_read_file(FILE *file, INIError_t *error)
                 char buffer[INI_MAX_LINE_SIZE];
                 snprintf(buffer, INI_MAX_LINE_SIZE, "Duplicate section '%s'.", dest_section.name);
                 set_parse_error_(error, line, discrepancy_offset, buffer);
-                goto parse_failure;
+                return NULL;
             }
             current_section = ini_add_section(data, dest_section.name);
             continue;
@@ -139,15 +143,9 @@ INIData_t *ini_read_file(FILE *file, INIError_t *error)
 
         // It's not a valid section
         set_parse_error_(error, line, discrepancy_offset, "Failed to parse section.");
-        goto parse_failure;
+        return NULL;
     }
 
-    goto done;
-    parse_failure:
-    ini_free_data(data);
-    return NULL;
-
-    done:
     return data;
 }
 
@@ -179,6 +177,7 @@ INISection_t *ini_add_section(INIData_t *data, const char *name)
 
     if (data->section_count >= data->section_allocation)
     {
+        if (!ini_realloc_) return NULL;
         data->section_allocation *= 2;
         INISection_t *re = ini_realloc_(data->sections, sizeof(INISection_t) * data->section_allocation);
         if (!re) return NULL;
@@ -206,6 +205,7 @@ INIPair_t *ini_add_pair_to_section(INISection_t *section, const INIPair_t pair)
 
     if (section->pair_count >= section->pair_allocation)
     {
+        if (!ini_realloc_) return NULL;
         section->pair_allocation *= 2;
         INIPair_t *re = ini_realloc_(section->pairs, sizeof(INIPair_t) * section->pair_allocation);
         if (!re) return NULL;
@@ -493,6 +493,7 @@ bool ini_parse_value(const char *line, char *dest, const unsigned n, ptrdiff_t *
 
 void ini_free_data(INIData_t *data)
 {
+    if (!ini_free_) return;
     if (data)
     {
         if (data->sections)
@@ -504,6 +505,24 @@ void ini_free_data(INIData_t *data)
         }
         ini_free_(data);
     }
+}
+
+
+
+INIData_t *ini_create_data()
+{
+    if (!ini_malloc_) return NULL;
+    INIData_t *data = ini_malloc_(sizeof(INIData_t));
+    if (!data) return NULL;
+    data->section_count = 0;
+    data->section_allocation = INITIAL_ALLOCATED_SECTIONS;
+    data->sections = ini_malloc_(sizeof(INISection_t) * data->section_allocation);
+    if (!data->sections)
+    {
+        free(data);
+        return NULL;
+    }
+    return data;
 }
 
 
@@ -532,16 +551,6 @@ static void clear_parse_error_(INIError_t *error)
 
 
 
-static void init_data_(INIData_t *data)
-{
-    if (!data) return;
-    data->section_count = 0;
-    data->section_allocation = INITIAL_ALLOCATED_SECTIONS;
-    data->sections = ini_malloc_(sizeof(INISection_t) * data->section_allocation);
-}
-
-
-
 static bool contains_spaces_(const char *str)
 {
     while (*str++ != '\0')
@@ -557,8 +566,9 @@ static void section_init_(const char *name, INISection_t *section)
     memset(section->name, 0, INI_MAX_STRING_SIZE);
     strncpy(section->name, name, INI_MAX_STRING_SIZE - 1);
     section->pair_count = 0;
-    section->pairs = ini_malloc_(sizeof(INIPair_t) * INITIAL_ALLOCATED_PAIRS);
     section->pair_allocation = INITIAL_ALLOCATED_PAIRS;
+    if (ini_malloc_)
+        section->pairs = ini_malloc_(sizeof(INIPair_t) * INITIAL_ALLOCATED_PAIRS);
 }
 
 
