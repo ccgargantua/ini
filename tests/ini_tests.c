@@ -127,7 +127,7 @@ TEST(ini_tests, values)
     const char comment[] = "key=value ; comment";
     const char string[] = "key=\"this is a value\"";
 
-    int n = 256;
+    const int n = 256;
     char buffer[n];
     ASSERT_TRUE(ini_parse_value(normal, buffer, n, NULL));
     ASSERT_STREQ(buffer, "value");
