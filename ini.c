@@ -51,7 +51,7 @@ static bool is_valid_section_starting_character_(char c);
 static bool is_valid_section_character_(char c);
 static bool is_valid_key_starting_value_(char c);
 static bool is_valid_key_character_(char c);
-static bool is_valid_value_character_(char c, bool quoted);
+static bool is_valid_value_character_(char c);
 
 
 
@@ -383,8 +383,16 @@ bool ini_parse_section(const char *line, INISection_t *section, ptrdiff_t *discr
     c = skip_ignored_characters_(c);
 
     if (!is_valid_section_starting_character_(*c)) goto is_not_section;
+
+    const char *last_space = NULL;
     while (is_valid_section_character_(*c))
     {
+        if (*c == ' ')
+        {
+            if (last_space && c - last_space == 1)
+                goto is_not_section;
+            last_space = c;
+        }
         if (dest_c)
         {
             if (dest_c - section->name >= INI_MAX_STRING_SIZE - 1)
@@ -393,7 +401,12 @@ bool ini_parse_section(const char *line, INISection_t *section, ptrdiff_t *discr
         }
         c++;
     }
-    if (dest_c) *dest_c = '\0';
+    if (dest_c)
+    {
+        if (last_space && c - last_space == 1)
+            dest_c--;
+        *dest_c = '\0';
+    }
 
     c = skip_ignored_characters_(c);
     if (*c != ']') goto is_not_section;
@@ -493,14 +506,23 @@ bool ini_parse_value(const char *line, char *dest, const unsigned n, ptrdiff_t *
     const bool quoted = (*c == '"');
     if (quoted) c++;
 
-    while (is_valid_value_character_(*c, quoted))
+    const char *last_space = NULL;
+    while (is_valid_value_character_(*c))
     {
+        if (*c == ' ')
+        {
+            if (last_space && c - last_space == 1)
+                if (!quoted) goto is_not_value;
+            last_space = c;
+        }
+
         if (dest)
         {
             if (c - beginning >= n - 1)
                 goto is_not_value;
             *dest++ = *c;
         }
+
         c++;
     }
 
@@ -509,8 +531,15 @@ bool ini_parse_value(const char *line, char *dest, const unsigned n, ptrdiff_t *
         if (*c != '"') goto is_not_value;
         c++;
     }
+    else
+        if (*c == '"') goto is_not_value;
 
-    if (dest) *dest = '\0';
+    if (dest)
+    {
+        if (last_space && c - last_space == 1)
+            dest--;
+        *dest = '\0';
+    }
 
     c = skip_ignored_characters_(c);
     if (*c == '\0') return true;
@@ -543,8 +572,10 @@ void ini_free_data(INIData_t *data)
 INIData_t *ini_create_data()
 {
     if (!ini_malloc_) return NULL;
+
     INIData_t *data = ini_malloc_(sizeof(INIData_t));
     if (!data) return NULL;
+
     data->section_count = 0;
     data->section_allocation = INI_INITIAL_ALLOCATED_SECTIONS;
     data->sections = ini_malloc_(sizeof(INISection_t) * data->section_allocation);
@@ -553,6 +584,7 @@ INIData_t *ini_create_data()
         free(data);
         return NULL;
     }
+
     for (unsigned i = 0; i < data->section_allocation; i++)
     {
         INISection_t *section = &data->sections[i];
@@ -560,8 +592,8 @@ INIData_t *ini_create_data()
         section->pair_allocation = INI_INITIAL_ALLOCATED_PAIRS;
         section->pairs = ini_malloc_(sizeof(INIPair_t) * section->pair_allocation);
         section->pair_count = 0;
-
     }
+
     return data;
 }
 
@@ -611,18 +643,21 @@ static void clear_parse_error_(INIError_t *error)
 
 static bool contains_spaces_(const char *str)
 {
-    while (*str++ != '\0')
-        if (*str == ' ') return true;
-    return false;
+    return str && strchr(str, ' ');
 }
 
 
 
 static const char *skip_ignored_characters_(const char *c)
 {
-    while (isspace(*c)) c++;
+    if (!c) return NULL;
+
+    while (isspace((unsigned char)*c))
+        c++;
+
     if (*c == ';' || *c == '#')
-        while (*c != '\0') c++;
+        return c + strlen(c);
+
     return c;
 }
 
@@ -637,7 +672,7 @@ static bool is_valid_section_starting_character_(const char c)
 
 static bool is_valid_section_character_(const char c)
 {
-    return (isalnum((unsigned char)c)) || c == '_';
+    return (isalnum((unsigned char)c)) || c == '_' || c == ' ';
 }
 
 
@@ -656,12 +691,12 @@ static bool is_valid_key_character_(const char c)
 
 
 
-static bool is_valid_value_character_(const char c, const bool quoted)
+static bool is_valid_value_character_(const char c)
 {
-    if (isalnum((unsigned char)c)) return true;
-    const char valid_special[] = "_-+.,:\'()[]{}\\/";
-    for (const char *p = valid_special; *p != '\0'; p++)
-        if (c == *p) return true;
-    if (quoted && c == ' ') return true;
-    return false;
+    if (c == '\n' || c == '\r' || c == '\0'
+    ||  strchr("[];#\"", c) != NULL
+    ||  iscntrl((unsigned)c))
+        return false;
+
+    return true;
 }

@@ -120,16 +120,20 @@ TEST(ini_tests, values)
     use_heap();
 
     const char normal[] = "key=value";
+    const char space[] = "key=value ";
     const char spaces[] = " key = value ";
     const char number[] = "key=5";
     const char alnum[] = "key=5val5";
-    const char special[] = "key=[]()/";
+    const char special[] = "key=~!@$%^&*()_+-{}|\\:'<>?,./";
     const char comment[] = "key=value ; comment";
     const char string[] = "key=\"this is a value\"";
 
     const int n = 256;
     char buffer[n];
     ASSERT_TRUE(ini_parse_value(normal, buffer, n, NULL));
+    ASSERT_STREQ(buffer, "value");
+
+    ASSERT_TRUE(ini_parse_value(space, buffer, n, NULL));
     ASSERT_STREQ(buffer, "value");
 
     ASSERT_TRUE(ini_parse_value(spaces, buffer, n, NULL));
@@ -142,7 +146,7 @@ TEST(ini_tests, values)
     ASSERT_STREQ(buffer, "5val5");
 
     ASSERT_TRUE(ini_parse_value(special, buffer, n, NULL));
-    ASSERT_STREQ(buffer, "[]()/");
+    ASSERT_STREQ(buffer, "~!@$%^&*()_+-{}|\\:'<>?,./");
 
     ASSERT_TRUE(ini_parse_value(comment, buffer, n, NULL));
     ASSERT_STREQ(buffer, "value");
@@ -157,13 +161,19 @@ TEST(ini_tests, bad_values)
 {
     use_heap();
 
-    const char two[] = "key=value value";
+    const char two_spaces[] = "key=value  value";
     const char bad_string[] = "key=\"the man said \"hello\"\"";
-    const char forbidden[] = "key=~value~";
+    const char forbidden_0[] = "key=val[ue";
+    const char forbidden_1[] = "key=val]ue";
+    const char forbidden_2[] = "key=val\nue";
+    const char forbidden_3[] = "key=val\rue";
 
-    ASSERT_FALSE(ini_parse_value(two, NULL, 0, NULL));
+    ASSERT_FALSE(ini_parse_value(two_spaces, NULL, 0, NULL));
     ASSERT_FALSE(ini_parse_value(bad_string, NULL, 0, NULL));
-    ASSERT_FALSE(ini_parse_value(forbidden, NULL, 0, NULL));
+    ASSERT_FALSE(ini_parse_value(forbidden_0, NULL, 0, NULL));
+    ASSERT_FALSE(ini_parse_value(forbidden_1, NULL, 0, NULL));
+    ASSERT_FALSE(ini_parse_value(forbidden_2, NULL, 0, NULL));
+    ASSERT_FALSE(ini_parse_value(forbidden_3, NULL, 0, NULL));
 
     // Exceed string size
     char value[INI_MAX_STRING_SIZE + 2];
@@ -211,8 +221,6 @@ TEST(ini_tests, bad_pairs)
     use_heap();
 
     const char line_invalid_key[] = "1key=value";
-    const char line_invalid_value[] = "key=va lue";
-    const char line_invalid_value_spaces[] = "key = value space";
     const char line_half[] = "key";
     const char line_empty[] = "";
     const char line_null[] = "\0";
@@ -223,12 +231,6 @@ TEST(ini_tests, bad_pairs)
 
     ASSERT_FALSE(ini_parse_pair(line_invalid_key, NULL, &error_offset));
     ASSERT_EQ(error_offset, 0);
-
-    ASSERT_FALSE(ini_parse_pair(line_invalid_value, NULL, &error_offset));
-    ASSERT_EQ(error_offset, 7);
-
-    ASSERT_FALSE(ini_parse_pair(line_invalid_value_spaces, NULL, &error_offset));
-    ASSERT_EQ(error_offset, 12);
 
     ASSERT_FALSE(ini_parse_pair(line_half, NULL, &error_offset));
     ASSERT_EQ(error_offset, 3);
@@ -287,7 +289,7 @@ TEST(ini_tests, bad_sections)
     ASSERT_EQ(error_offset, 0);
 
     ASSERT_FALSE(ini_parse_section(line_invalid_double, NULL, &error_offset));
-    ASSERT_EQ(error_offset, 11);
+    ASSERT_EQ(error_offset, 9);
 
     ASSERT_FALSE(ini_parse_section(line_empty, NULL, &error_offset));
     ASSERT_EQ(error_offset, 0);
@@ -563,7 +565,7 @@ TEST(ini_tests, parse_error_bad_value)
 {
     use_heap();
     const char contents[] = "[ValidSection]\n"
-                            "bad=pa$ir\n";
+                            "bad=pa\"ir\n";
     FILE *file = tmpfile();
     fputs(contents, file);
     rewind(file);
@@ -571,7 +573,7 @@ TEST(ini_tests, parse_error_bad_value)
     INIData_t *data = ini_create_data();
     ASSERT_TRUE(ini_read_file(file, data, &error) == NULL);
     ASSERT_TRUE(error.encountered);
-    ASSERT_STREQ(error.line, "bad=pa$ir\n");
+    ASSERT_STREQ(error.line, "bad=pa\"ir\n");
     ASSERT_STREQ(error.msg, "Failed to parse pair.");
     ini_free_data(data);
     fclose(file);
@@ -601,7 +603,7 @@ TEST(ini_tests, parse_error_no_section)
 TEST(ini_tests, parse_error_bad_section)
 {
     use_heap();
-    const char contents[] = "[Bad Section]\n";
+    const char contents[] = "[Bad-Section]\n";
     FILE *file = tmpfile();
     fputs(contents, file);
     rewind(file);
@@ -609,8 +611,9 @@ TEST(ini_tests, parse_error_bad_section)
     INIData_t *data = ini_create_data();
     ASSERT_TRUE(ini_read_file(file, data, &error) == NULL);
     ASSERT_TRUE(error.encountered);
-    ASSERT_STREQ(error.line, "[Bad Section]\n");
+    ASSERT_STREQ(error.line, "[Bad-Section]\n");
     ASSERT_STREQ(error.msg, "Failed to parse section.");
+    ASSERT_EQ(error.offset, 4);
     ini_free_data(data);
     fclose(file);
 }
