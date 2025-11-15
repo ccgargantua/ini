@@ -45,7 +45,7 @@ static void *(*ini_realloc_) (void *, size_t) = INI_DEFAULT_REALLOC;
 // Static helpers
 static void set_parse_error_(INIError_t *error, const char *line, ptrdiff_t offset, const char *msg);
 static void clear_parse_error_(INIError_t *error);
-static bool contains_spaces_(const char *str);
+static bool contains_consecutive_spaces_(const char *str);
 static const char *skip_ignored_characters_(const char *c);
 static bool is_valid_section_starting_character_(char c);
 static bool is_valid_section_character_(char c);
@@ -182,7 +182,7 @@ void ini_write_file(const INIData_t *data, FILE *file)
         fprintf(file, "[%s]\n", section->name);
         for (unsigned j = 0; j < section->pair_count; j++)
         {
-            if (contains_spaces_(section->pairs[j].value))
+            if (contains_consecutive_spaces_(section->pairs[j].value))
                 fprintf(file, "%s=\"%s\"\n", section->pairs[j].key, section->pairs[j].value);
             else
                 fprintf(file, "%s=%s\n", section->pairs[j].key, section->pairs[j].value);
@@ -654,9 +654,9 @@ static void clear_parse_error_(INIError_t *error)
 
 
 
-static bool contains_spaces_(const char *str)
+static bool contains_consecutive_spaces_(const char *str)
 {
-    return str && strchr(str, ' ');
+    return str && strstr(str, "  ");
 }
 
 

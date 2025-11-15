@@ -535,7 +535,8 @@ TEST(ini_tests, file_writing)
                             "hello=world\n"
                             "hi=true\n"
                             "val=5\n"
-                            "this_one=\"is a string\"\n";
+                            "this: is a string"
+                            "this_one=\"is a string with   consecutive spaces\"\n";
 
     FILE *input_file = tmpfile();
     assert(input_file);
