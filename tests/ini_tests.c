@@ -8,6 +8,7 @@
 #include <stdlib.h>
 
 
+
 // If you don't want some nasty bugs, call these appropriately at the beginning
 // of each TEST
 static void use_heap();
@@ -25,7 +26,8 @@ TEST(ini_tests, blank_lines)
     const char tab_line[] = "\t";
     const char new_line[] = "\n";
     const char null_line[] = "\0";
-    const char alt_comment_line[] = "; comment here!";
+    const char comment_line[] = "; comment here";
+    const char alt_comment_line[] = "# and here!";
 
     ASSERT_TRUE(ini_is_blank_line(empty_line));
     ASSERT_TRUE(ini_is_blank_line(space_line));
@@ -33,6 +35,7 @@ TEST(ini_tests, blank_lines)
     ASSERT_TRUE(ini_is_blank_line(tab_line));
     ASSERT_TRUE(ini_is_blank_line(new_line));
     ASSERT_TRUE(ini_is_blank_line(null_line));
+    ASSERT_TRUE(ini_is_blank_line(comment_line));
     ASSERT_TRUE(ini_is_blank_line(alt_comment_line));
 }
 
@@ -63,7 +66,7 @@ TEST(ini_tests, keys)
     const char caps[] = "KEY=value";
     const char number[] = "key5=value";
 
-    int n = 256;
+    const int n = 256;
     char buffer[n];
     ASSERT_TRUE(ini_parse_key(normal, buffer, n, NULL));
     ASSERT_STREQ(buffer, "key");
@@ -126,7 +129,8 @@ TEST(ini_tests, values)
     const char alnum[] = "key=5val5";
     const char special[] = "key=~!@$%^&*()_+-{}|\\:'<>?,./";
     const char comment[] = "key=value ; comment";
-    const char string[] = "key=\"this is a value\"";
+    const char string[] = "key=this is a value";
+    const char quoted_string[] = "key=\"extra   spaces\"";
 
     const int n = 256;
     char buffer[n];
@@ -153,6 +157,9 @@ TEST(ini_tests, values)
 
     ASSERT_TRUE(ini_parse_value(string, buffer, n, NULL));
     ASSERT_STREQ(buffer, "this is a value");
+
+    ASSERT_TRUE(ini_parse_value(quoted_string, buffer, n, NULL));
+    ASSERT_STREQ(buffer, "extra   spaces");
 }
 
 
@@ -162,18 +169,22 @@ TEST(ini_tests, bad_values)
     use_heap();
 
     const char two_spaces[] = "key=value  value";
-    const char bad_string[] = "key=\"the man said \"hello\"\"";
+    const char bad_string_0[] = "key=\"the man said \"hello\"\"";
+    const char bad_string_1[] = "key=\"the man said hello";
     const char forbidden_0[] = "key=val[ue";
     const char forbidden_1[] = "key=val]ue";
     const char forbidden_2[] = "key=val\nue";
     const char forbidden_3[] = "key=val\rue";
+    const char alone[] = "value";
 
     ASSERT_FALSE(ini_parse_value(two_spaces, NULL, 0, NULL));
-    ASSERT_FALSE(ini_parse_value(bad_string, NULL, 0, NULL));
+    ASSERT_FALSE(ini_parse_value(bad_string_0, NULL, 0, NULL));
+    ASSERT_FALSE(ini_parse_value(bad_string_1, NULL, 0, NULL));
     ASSERT_FALSE(ini_parse_value(forbidden_0, NULL, 0, NULL));
     ASSERT_FALSE(ini_parse_value(forbidden_1, NULL, 0, NULL));
     ASSERT_FALSE(ini_parse_value(forbidden_2, NULL, 0, NULL));
     ASSERT_FALSE(ini_parse_value(forbidden_3, NULL, 0, NULL));
+    ASSERT_FALSE(ini_parse_value(alone, NULL, 0, NULL));
 
     // Exceed string size
     char value[INI_MAX_STRING_SIZE + 2];
@@ -256,7 +267,7 @@ TEST(ini_tests, sections)
     use_heap();
 
     const char line[] = "[section]";
-    const char line_spaces[] = " [ section ] ";
+    const char line_spaces[] = " [ This is a section ] ";
     const char line_comment[] = "[section] ; comment here";
 
     INISection_t section;
@@ -264,7 +275,7 @@ TEST(ini_tests, sections)
     ASSERT_STREQ(section.name, "section");
 
     ASSERT_TRUE(ini_parse_section(line_spaces, &section, NULL));
-    ASSERT_STREQ(section.name, "section");
+    ASSERT_STREQ(section.name, "This is a section");
 
     ASSERT_TRUE(ini_parse_section(line_comment, &section, NULL));
     ASSERT_STREQ(section.name, "section");
@@ -277,7 +288,7 @@ TEST(ini_tests, bad_sections)
     use_heap();
 
     const char line_invalid[] = "x[section]";
-    const char line_invalid_double[] = "[section   section]";
+    const char line_invalid_spaces[] = "[section   section]";
     const char line_empty[] = "";
     const char line_spaces[] = "  ";
     const char line_null[] = "\0";
@@ -288,7 +299,7 @@ TEST(ini_tests, bad_sections)
     ASSERT_FALSE(ini_parse_section(line_invalid, NULL, &error_offset));
     ASSERT_EQ(error_offset, 0);
 
-    ASSERT_FALSE(ini_parse_section(line_invalid_double, NULL, &error_offset));
+    ASSERT_FALSE(ini_parse_section(line_invalid_spaces, NULL, &error_offset));
     ASSERT_EQ(error_offset, 9);
 
     ASSERT_FALSE(ini_parse_section(line_empty, NULL, &error_offset));
@@ -454,7 +465,7 @@ TEST(ini_tests, get_float)
 {
     use_heap();
 
-    const float expected = 5.5;
+    const float expected = 5.5f;
     FILE *file = tmpfile();
     assert(file);
     fprintf(file,"[section]\nval=%f", expected);
@@ -737,6 +748,8 @@ static void use_heap()
     ini_set_free(free);
     ini_set_reallocator(realloc);
 }
+
+
 
 static void use_stack()
 {
