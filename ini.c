@@ -254,9 +254,11 @@ INISection_t *ini_has_section(const INIData_t *data, const char *section)
     if (!data || !section || !data->sections) return NULL;
     static INIData_t *cached_data = NULL;
     static INISection_t *cached = NULL;
+
     if (cached && cached_data)
         if (data == cached_data && strncmp(section, cached->name, INI_MAX_STRING_SIZE) == 0)
             return cached;
+
     for (unsigned i = 0; i < data->section_count; i++)
         if (strncmp(section, data->sections[i].name, INI_MAX_STRING_SIZE) == 0)
         {
@@ -406,14 +408,17 @@ bool ini_parse_section(const char *line, INISection_t *section, ptrdiff_t *discr
                 goto is_not_section;
             last_space = c;
         }
+
         if (dest_c)
         {
             if (dest_c - section->name >= INI_MAX_STRING_SIZE - 1)
                 return false;
             *dest_c++ = *c;
         }
+
         c++;
     }
+
     if (dest_c)
     {
         if (last_space && c - last_space == 1)
@@ -544,6 +549,7 @@ bool ini_parse_value(const char *line, char *dest, const unsigned n, ptrdiff_t *
         if (*c != '"') goto is_not_value;
         c++;
     }
+
     else
         if (*c == '"') goto is_not_value;
 
