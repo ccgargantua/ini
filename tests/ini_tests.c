@@ -61,9 +61,9 @@ TEST(ini_tests, keys)
 
     const char normal[] = "key=value";
     const char spaces[] = " key = value ";
-    const char comment[] = "key=value ; comment";
+    const char comment[] = "key:value ; comment";
     const char string[] = "key=\"this is a value\"";
-    const char caps[] = "KEY=value";
+    const char caps[] = "KEY:value";
     const char number[] = "key5=value";
 
     const int n = 256;
@@ -95,8 +95,8 @@ TEST(ini_tests, bad_keys)
 
     const char number_start[] = "5key=value";
     const char special_start[] = "]key=value";
-    const char special_middle[] = "k:ey=value";
-    const char two[] = "key key=value";
+    const char special_middle[] = "k-ey=value";
+    const char two[] = "key key:value";
     const char alone[] = "KEY";
 
     ASSERT_FALSE(ini_parse_key(number_start, NULL, 0, NULL));
@@ -123,14 +123,16 @@ TEST(ini_tests, values)
     use_heap();
 
     const char normal[] = "key=value";
-    const char space[] = "key=value ";
+    const char space[] = "key:value ";
     const char spaces[] = " key = value ";
-    const char number[] = "key=5";
+    const char number[] = "key:5";
     const char alnum[] = "key=5val5";
     const char special[] = "key=~!@$%^&*()_+-{}|\\:'<>?,./";
-    const char comment[] = "key=value ; comment";
+    const char comment[] = "key:value ; comment";
     const char string[] = "key=this is a value";
     const char quoted_string[] = "key=\"extra   spaces\"";
+    const char equation[] = "key=2+2=4";
+    const char mac[] = "key:00:1B:63:84:45:E6";
 
     const int n = 256;
     char buffer[n];
@@ -160,6 +162,12 @@ TEST(ini_tests, values)
 
     ASSERT_TRUE(ini_parse_value(quoted_string, buffer, n, NULL));
     ASSERT_STREQ(buffer, "extra   spaces");
+
+    ASSERT_TRUE(ini_parse_value(equation, buffer, n, NULL));
+    ASSERT_STREQ(buffer, "2+2=4");
+
+    ASSERT_TRUE(ini_parse_value(mac, buffer, n, NULL));
+    ASSERT_STREQ(buffer, "00:1B:63:84:45:E6");
 }
 
 

@@ -494,7 +494,7 @@ bool ini_parse_key(const char *line, char *dest, const unsigned n, ptrdiff_t *di
     if (dest) *dest = '\0';
 
     c = skip_ignored_characters_(c);
-    if (*c == '=') return true;
+    if (*c == '=' || *c == ':') return true;
 
     is_not_key:
     if (discrepancy) *discrepancy = c - line;
@@ -509,8 +509,8 @@ bool ini_parse_value(const char *line, char *dest, const unsigned n, ptrdiff_t *
 
     const char *c = line;
 
-    while (*c != '\0' && *c != '=') c++;
-    if (*c != '=') goto is_not_value;
+    while (*c != '=' && *c != ':') c++;
+    if (*c == '\0') goto is_not_value;
     c++;
 
     c = skip_ignored_characters_(c);
