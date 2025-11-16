@@ -124,7 +124,7 @@ void               ini_init_data           (INIData_t*,       INISection_t*,  IN
 #ifndef INI_DEFAULT_ALLOC
     #define INI_DEFAULT_ALLOC malloc
 #endif
-#ifndef INI_DEFAUT_FREE
+#ifndef INI_DEFAULT_FREE
     #define INI_DEFAULT_FREE free
 #endif
 #ifndef INI_DEFAULT_REALLOC
