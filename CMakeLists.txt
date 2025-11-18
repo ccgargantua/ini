@@ -14,7 +14,14 @@ if(INI_TEST)
     add_compile_definitions(INI_TEST)
     add_executable(ini_tests
             tests/rktest.c
-            tests/ini_tests.c
+            tests/fileio.c
+            tests/blank_lines.c
+            tests/keys.c
+            tests/values.c
+            tests/sections.c
+            tests/pairs.c
+            tests/queries.c
+            tests/fuzzing.c
     )
     target_link_libraries(ini_tests PRIVATE ini m)
     target_compile_options(ini_tests PRIVATE -Wall -Wextra -pedantic)

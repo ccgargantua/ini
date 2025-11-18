@@ -296,8 +296,10 @@ INIData_t *ini_read_file_path(const char *path, INIData_t *data, INIError_t *err
  * Params:
  *   file   - File pointer to parse
  *   data   - The database object to be filled with ini
- *            contents.
- *   buffer - Line buffer to store erroneous line. Must be
+ *            contents. Must be a valid pointer.
+ *   error  - Pointer to error object to keep track of
+ *            erroneous character offset and store error
+ *            message
  *
  *
  * Returns:
@@ -357,10 +359,12 @@ INISection_t *ini_add_section(INIData_t *data, const char *name);
  * name and indirectly adding it to the section.
  *
  * Param:
- *   data    - The INIData_t object to add the pair to.
+ *   data    - The INIData_t object to add the pair to. Must be
+ *             a valid pointer
  *   section - The **name** of the section to add the pair
- *             to.
- *   pair    - The pair to be added.
+ *             to. Assumed to be null-terminated.
+ *   pair    - The pair to be added. Assumed that both internal
+ *             strings for key and value are null-terminated.
  *
  * Return:
  *   A pointer to the pair after being added to the proper
@@ -545,7 +549,8 @@ bool ini_get_bool(const INIData_t *data, const char *section, const char *key, b
  * INI syntax rules (contains only whitespace or comments)
  *
  * Params:
- *   line - The character array to be parsed.
+ *   line - The character array to be parsed. Assumed
+ *          to be null-terminated.
  *
  * Returns:
  *   True if the line is considered blank, false
@@ -560,7 +565,8 @@ bool ini_is_blank_line(const char *line);
  * attempts to parse a valid section.
  *
  * Params:
- *   line         - The character array to be parsed.
+ *   line         - The character array to be parsed. Assumed
+ *                  to be null-terminated.
  *   section      - A pointer to a destination section to
  *                  store name strings. If NULL is provided,
  *                  has no effect. If a string is not a valid
@@ -573,7 +579,7 @@ bool ini_is_blank_line(const char *line);
  *
  * Returns:
  *   True if the line is considered a valid section,
- *   false otherwise.
+ *   false otherwise or on failure.
  */
 bool ini_parse_section(const char *line, INISection_t *section, ptrdiff_t *discrepancy);
 
@@ -584,7 +590,8 @@ bool ini_parse_section(const char *line, INISection_t *section, ptrdiff_t *discr
  * attempts to parse a valid pair.
  *
  * Params:
- *   line         - The character array to be parsed.
+ *   line         - The character array to be parsed. Assumed to be
+ *                  null-terminated.
  *   pair         - A pointer to a destination pair to store
  *                  key and value strings. If NULL is provided,
  *                  has no effect. If a string is not a valid
@@ -597,7 +604,7 @@ bool ini_parse_section(const char *line, INISection_t *section, ptrdiff_t *discr
  *
  * Returns:
  *   True if the line is considered a legal k=v pair,
- *   false otherwise.
+ *   false otherwise or on failure.
  */
 bool ini_parse_pair(const char *line, INIPair_t *pair, ptrdiff_t *discrepancy);
 
@@ -608,12 +615,15 @@ bool ini_parse_pair(const char *line, INIPair_t *pair, ptrdiff_t *discrepancy);
  * attempts to parse a valid key.
  *
  * Params:
- *   line         - The character array to be parsed.
+ *   line         - The character array to be parsed. Assumed
+ *                  to be null-terminated.
  *   dest         - A pointer to a destination buffer to
  *                  store key string. If NULL is provided,
  *                  has no effect. If a string is not a valid
  *                  section, then the string is invalid and
  *                  not guaranteed to be null-terminated.
+ *   n            - The size of the destination buffer. Assumed
+ *                  to be accurate.
  *   discrepancy  - A pointer to an integer representing the
  *                  offset of the erroneous character if
  *                  present. If no error found, will be given
@@ -621,7 +631,7 @@ bool ini_parse_pair(const char *line, INIPair_t *pair, ptrdiff_t *discrepancy);
  *
  * Returns:
  *   True if the line is considered a valid key, false
- *   otherwise.
+ *   otherwise or on failure.
  */
 bool ini_parse_key(const char *line, char *dest, unsigned n, ptrdiff_t *discrepancy);
 
@@ -638,6 +648,8 @@ bool ini_parse_key(const char *line, char *dest, unsigned n, ptrdiff_t *discrepa
  *                  has no effect. If a string is not a valid
  *                  section, then the string is invalid and
  *                  not guaranteed to be null-terminated.
+ *   n            - The size of the destination buffer. Assumed
+ *                  to be accurate.
  *   discrepancy  - A pointer to an integer representing the
  *                  offset of the erroneous character if
  *                  present. If no error found, will be given
