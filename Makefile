@@ -6,7 +6,7 @@ BUILD_DIR = build
 SRC_INI = ./ini.c
 OBJ_INI = $(BUILD_DIR)/ini.o
 
-SRC_TESTS = tests/rktest.c tests/ini_tests.c
+SRC_TESTS := $(wildcard tests/*.c)
 TEST_BIN = $(BUILD_DIR)/tests
 
 SRC_MAIN = example/main.c

@@ -217,6 +217,7 @@ void ini_write_file_pointer(FILE *file, const INIData_t *data)
 
 INISection_t *ini_add_section(INIData_t *data, const char *name)
 {
+    if (!data || !name) return NULL;
     if (ini_has_section(data, name)) return NULL;
 
     if (data->section_count >= data->section_allocation)
@@ -386,6 +387,7 @@ bool ini_get_bool(const INIData_t *data, const char *section, const char *key, c
 // Assumes line is null-terminated.
 bool ini_is_blank_line(const char *line)
 {
+    if (!line) return false;
     const char *c = skip_ignored_characters_(line);
     return *c == '\0';
 }
@@ -494,6 +496,8 @@ bool ini_parse_pair(const char *line, INIPair_t *pair, ptrdiff_t *discrepancy)
 
 bool ini_parse_key(const char *line, char *dest, const unsigned n, ptrdiff_t *discrepancy)
 {
+    if (!line) return false;
+
     if (discrepancy) *discrepancy = 0;
 
     const char *c = line;
@@ -524,11 +528,13 @@ bool ini_parse_key(const char *line, char *dest, const unsigned n, ptrdiff_t *di
 
 bool ini_parse_value(const char *line, char *dest, const unsigned n, ptrdiff_t *discrepancy)
 {
+    if (!line) return false;
+
     if (discrepancy) *discrepancy = 0;
 
     const char *c = line;
 
-    while (*c != '=' && *c != ':') c++;
+    while (*c != '=' && *c != ':' && *c != '\0') c++;
     if (*c == '\0') goto is_not_value;
     c++;
 
