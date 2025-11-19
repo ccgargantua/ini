@@ -31,16 +31,18 @@ void heap()
     INIData_t *ini = ini_create_data();
 
     INIError_t error;
-    ini_read_file("example/example.ini", ini, &error);
+    ini_read_file("example/example.ini", ini, &error, 0);
 
     if (error.encountered)
-        print_error(&error);
+    {
+        printf("%s\n%s\n%*s^\n", error.msg, error.line, error.offset, "");
+        return;
+    }
 
     const char *greeting = ini_get_value(ini, "Text", "greeting");
     assert(greeting);
 
-    const char *subject = ini_get_value(ini, "Text", "subject");
-    assert(subject);
+    const char *subject = ini_get_string(ini, "Text", "subject", "nobody...");
 
     bool enthusiastic = ini_get_bool(ini, "Text", "enthusiastic", false);
     const char enthusiasm = enthusiastic ? '!' : '.';
@@ -78,15 +80,17 @@ void stack()
     ini_init_data(&ini, sections, section_pairs, max_sections, max_pairs);
 
     INIError_t error;
-    ini_read_file("example/example.ini", &ini, &error);
+    ini_read_file("example/example.ini", &ini, &error, 0);
     if (error.encountered)
-        print_error(&error);
+    {
+        printf("%s\n%s\n%*s^\n", error.msg, error.line, error.offset, "");
+        return;
+    }
 
     const char *greeting = ini_get_value(&ini, "Text", "greeting");
     assert(greeting);
 
-    const char *subject = ini_get_value(&ini, "Text", "subject");
-    assert(subject);
+    const char *subject = ini_get_string(&ini, "Text", "subject", "nobody...");
 
     bool enthusiastic = ini_get_bool(&ini, "Text", "enthusiastic", false);
     const char enthusiasm = enthusiastic ? '!' : '.';
@@ -99,17 +103,4 @@ void stack()
     const char *pi_string = ini_get_string(&ini, "Pi", "string", "pi =");
     float pi = ini_get_float(&ini, "Pi", "pi", 3);
     printf("%s %f\n", pi_string, pi);
-}
-
-
-
-void print_error(INIError_t *error)
-{
-    char buffer[error->offset+1];
-    int i = 0;
-    for (i = 0; i < error->offset; i++)
-        buffer[i] = ' ';
-    buffer[i++] = '^';
-    buffer[i] = '\0';
-    printf("%s\n%s\n%s\n", error->msg, error->line, buffer);
 }
