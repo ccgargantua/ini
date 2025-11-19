@@ -31,6 +31,7 @@
  
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 
 
@@ -57,8 +58,8 @@ void               ini_set_free            (void(*)(void*));
 void               ini_set_reallocator     (void*(*)(void*,    size_t));
 
 // File I/O
-INIData_t         *ini_read_file_path      (const char*,       INIData_t*,       INIError_t*);
-INIData_t         *ini_read_file_pointer   (FILE*,             INIData_t*,       INIError_t*);
+INIData_t         *ini_read_file_path      (const char*,       INIData_t*,       INIError_t*, uint64_t);
+INIData_t         *ini_read_file_pointer   (FILE*,             INIData_t*,       INIError_t*, uint64_t);
 void               ini_write_file_path     (const char*,       const INIData_t*);
 void               ini_write_file_pointer  (FILE*, const INIData_t*);
 
@@ -89,28 +90,17 @@ INIData_t         *ini_create_data         (void);
 void               ini_free_data           (INIData_t*);
 
 // Stack
-void               ini_init_data           (INIData_t*,       INISection_t*,  INIPair_t**,  unsigned, unsigned);
+void               ini_init_data           (INIData_t*,        INISection_t*,    INIPair_t**, unsigned, unsigned);
 
 
 
-/* Macros */
-
-#define ini_read_file(T,data,error) _Generic((T), \
-    const char*: ini_read_file_path,              \
-    char*:       ini_read_file_path,              \
-    FILE*:       ini_read_file_pointer            \
-)(T,data,error)
-
-#define ini_write_file(T,data) _Generic((T), \
-    const char*: ini_write_file_path,              \
-    char*:       ini_write_file_path,              \
-    FILE*:       ini_write_file_pointer            \
-)(T,data)
+//////////////
+//  MACROS  //
+//////////////
 
 
 
-// You can redefine these at compile time if you'd like to
-// avoid changing allocator functions at runtime.
+// You can redefine these without issue.
 
 #ifndef INI_MAX_STRING_SIZE
     #define INI_MAX_STRING_SIZE 256
@@ -139,6 +129,30 @@ void               ini_init_data           (INIData_t*,       INISection_t*,  IN
 #ifndef INI_INITIAL_ALLOCATED_SECTIONS
     #define INI_INITIAL_ALLOCATED_SECTIONS 8
 #endif
+
+
+
+// I strongly advise against changing these
+
+#define ini_read_file(T,data,error,flags) _Generic((T), \
+    const char*: ini_read_file_path,              \
+    char*:       ini_read_file_path,              \
+    FILE*:       ini_read_file_pointer            \
+)(T,data,error,flags)
+
+#define ini_write_file(T,data) _Generic((T), \
+    const char*: ini_write_file_path,              \
+    char*:       ini_write_file_path,              \
+    FILE*:       ini_write_file_pointer            \
+)(T,data)
+
+
+
+// File parsing flags
+
+#define INI_CONTINUE_PAST_ERROR      (1ull << 0)
+#define INI_ALLOW_DUPLICATE_SECTIONS (1ull << 1)
+
 
 
 ////////////////////////
@@ -280,12 +294,14 @@ void ini_set_reallocator(void *(*reallocator) (void*,size_t));
  *   data   - The database object to be filled with ini
  *            contents.
  *   buffer - Line buffer to store erroneous line. Must be
+ *   flags  - Bit-aligned flags to control behavior of the
+ *            file parser. See the flag macros
  *
  *
  * Returns:
  *   A pointer to data on success, or NULL on failure.
  */
-INIData_t *ini_read_file_path(const char *path, INIData_t *data, INIError_t *error);
+INIData_t *ini_read_file_path(const char *path, INIData_t *data, INIError_t *error, uint64_t flags);
 
 
 /*
@@ -300,12 +316,14 @@ INIData_t *ini_read_file_path(const char *path, INIData_t *data, INIError_t *err
  *   error  - Pointer to error object to keep track of
  *            erroneous character offset and store error
  *            message
+ *   flags  - Bit-aligned flags to control behavior of the
+ *            file parser. See the flag macros
  *
  *
  * Returns:
  *   A pointer to data on success, or NULL on failure.
  */
-INIData_t *ini_read_file_pointer(FILE *file, INIData_t *data, INIError_t *error);
+INIData_t *ini_read_file_pointer(FILE *file, INIData_t *data, INIError_t *error, uint64_t flags);
 
 
 
