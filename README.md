@@ -83,10 +83,10 @@ The easiest way to parse this file is to create our database object
 and pass the filepath to the parsing function.
 
 ```c++
-    INIData_t *ini = ini_create_data();
-    ini_read_file("example/example.ini", ini, NULL, 0);
-    // do what you need
-    ini_free_data(ini);
+INIData_t *ini = ini_create_data();
+ini_read_file("example/example.ini", ini, NULL, 0);
+// do what you need
+ini_free_data(ini);
 ```
 
 On success, the `ini_read_file` function returns the very same
@@ -95,9 +95,9 @@ This library doesn't necessarily force you to check for this, but
 you would probably still like to know if that happens.
 
 ```c++
-    if (!ini_read_file("example/example.ini", ini, NULL, 0)) {
-        // Handle accordingly.
-    }
+if (!ini_read_file("example/example.ini", ini, NULL, 0)) {
+    // Handle accordingly.
+}
 ```
 
 You'll notice that we have two additional arguments. Above, we
@@ -107,21 +107,21 @@ populate the appropriate struct members with details of any
 error encountered while parsing.
 
 ```c++
-    INIData_t *ini = ini_create_data();
-    INIError_t error;
-    ini_read_file("example/example.ini", ini, &error, 0);
+INIData_t *ini = ini_create_data();
+INIError_t error;
+ini_read_file("example/example.ini", ini, &error, 0);
 ```
 
 After parsing our file, we could print out the details of any
 error that might occur.
 
 ```c++
-    ini_read_file("example/example.ini", &ini, &error, 0);
-    if (error.encountered)
-    {
-      printf("%s\n%s\n%*s^\n", error.msg, error.line, error.offset, "");
-      // do anything else you need to do
-    }
+ini_read_file("example/example.ini", &ini, &error, 0);
+if (error.encountered)
+{
+  printf("%s\n%s\n%*s^\n", error.msg, error.line, error.offset, "");
+  // do anything else you need to do
+}
 ```
 
 That fourth parameter is a 64-bit integer that accepts flags.
@@ -133,11 +133,11 @@ As of right now, there are only two flags implemented:
 So, we could have done:
 
 ```c++
-    INIData_t *ini = ini_create_data();
-    INIError_t error;
-    ini_read_file("example/example.ini", ini, &error, INI_CONTINUE_PAST_ERROR);
-    if (error.encountered)
-        print_error(&error);    
+INIData_t *ini = ini_create_data();
+INIError_t error;
+ini_read_file("example/example.ini", ini, &error, INI_CONTINUE_PAST_ERROR);
+if (error.encountered)
+    print_error(&error);    
 ```
 
 Now, the parser will only fail if it can't continue, and you can see what
@@ -165,7 +165,6 @@ to avoid aggressive compiler warnings you can simply cast the return
 value.
 
 ```c++
-
 // Query for strings
 const char *subject = ini_get_string(&ini, "Text", "subject", "nobody...");
 
@@ -191,19 +190,19 @@ This library gives you the option to use the stack rather than the
 heap. All this changes about our code is how we initialize the
 `INIData_t` object.
 
-```
-    const int max_sections = 32;
-    const int max_pairs = 32;
+```c++
+const int max_sections = 32;
+const int max_pairs = 32;
 
-    // Create our data on the stack
-    INISection_t sections[max_sections];
-    INIPair_t pairs[max_sections][max_pairs];
-    INIPair_t *section_pairs[max_sections];
-    for (int i = 0; i < max_sections; i++)
-        section_pairs[i] = pairs[i];
+// Create our data on the stack
+INISection_t sections[max_sections];
+INIPair_t pairs[max_sections][max_pairs];
+INIPair_t *section_pairs[max_sections];
+for (int i = 0; i < max_sections; i++)
+    section_pairs[i] = pairs[i];
 
-    INIData_t ini;
-    ini_init_data(&ini, sections, section_pairs, max_sections, max_pairs);
+INIData_t ini;
+ini_init_data(&ini, sections, section_pairs, max_sections, max_pairs);
 ```
 
 This block of code shows us create stack-allocated arrays of objects
