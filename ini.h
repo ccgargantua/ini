@@ -151,7 +151,7 @@ void               ini_init_data           (INIData_t*,        INISection_t*,   
 // File parsing flags
 
 #define INI_CONTINUE_PAST_ERROR      (1ull << 0)
-#define INI_ALLOW_DUPLICATE_KEYS     (1ull << 1)
+#define INI_ALLOW_DUPLICATE_SECTIONS (1ull << 1)
 
 
 
