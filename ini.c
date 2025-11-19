@@ -94,7 +94,7 @@ void ini_set_reallocator(void *(*reallocator) (void *,size_t))
 
 
 
-INIData_t *ini_read_file_path(const char *path, INIData_t *data, INIError_t *error){
+INIData_t *ini_read_file_path(const char *path, INIData_t *data, INIError_t *error, uint64_t flags){
     if (!path || !data) return NULL;
     clear_parse_error_(error);
 
@@ -104,14 +104,14 @@ INIData_t *ini_read_file_path(const char *path, INIData_t *data, INIError_t *err
         set_parse_error_(error, path, 0, "Could not open file");
         return NULL;
     }
-    data = ini_read_file_pointer(file, data, error);
+    data = ini_read_file_pointer(file, data, error, flags);
     fclose(file);
     return data;
 }
 
 
 
-INIData_t *ini_read_file_pointer(FILE *file, INIData_t *data, INIError_t *error)
+INIData_t *ini_read_file_pointer(FILE *file, INIData_t *data, INIError_t *error, uint64_t flags)
 {
     if (!file || !data) return NULL;
     clear_parse_error_(error);
@@ -132,48 +132,61 @@ INIData_t *ini_read_file_pointer(FILE *file, INIData_t *data, INIError_t *error)
         {
             if (!current_section)
             {
+                if (flags & INI_CONTINUE_PAST_ERROR) continue;
                 set_parse_error_(error, line, discrepancy_offset, "Pairs must reside within a section.");
                 return NULL;
             }
 
             if (!ini_add_pair_to_section(current_section, pair))
             {
+                if (flags & INI_CONTINUE_PAST_ERROR) continue;
+
                 char buffer[INI_MAX_LINE_SIZE];
                 snprintf(buffer,
                     INI_MAX_LINE_SIZE,
                     "Failed to add pair '%s=%s' to section '%s'. Possibly insufficient allocation space.",
                     pair.key, pair.value, current_section->name);
                 set_parse_error_(error, line, discrepancy_offset, buffer);
+
                 return NULL;
             }
         }
 
         else if (line[discrepancy_offset] != '[')
         {
+            if (flags & INI_CONTINUE_PAST_ERROR) continue;
             set_parse_error_(error, line, discrepancy_offset, "Failed to parse pair.");
             return NULL;
         }
 
         else if (ini_parse_section(line, &dest_section, &discrepancy_offset))
         {
-            const INISection_t *existing_section = ini_has_section(data, dest_section.name);
+            INISection_t *existing_section = ini_has_section(data, dest_section.name);
             if (existing_section)
             {
-                char buffer[INI_MAX_LINE_SIZE];
-                snprintf(buffer, INI_MAX_LINE_SIZE, "Duplicate section '%s'.", dest_section.name);
-                set_parse_error_(error, line, discrepancy_offset, buffer);
-                return NULL;
+                if (flags & (INI_ALLOW_DUPLICATE_SECTIONS | INI_CONTINUE_PAST_ERROR))
+                    current_section = existing_section;
+                else
+                {
+                    char buffer[INI_MAX_LINE_SIZE];
+                    snprintf(buffer, INI_MAX_LINE_SIZE, "Duplicate section '%s'.", dest_section.name);
+                    set_parse_error_(error, line, discrepancy_offset, buffer);
+                    return NULL;
+                }
             }
-            current_section = ini_add_section(data, dest_section.name);
-            if (!current_section)
+            else
             {
-                char buffer[INI_MAX_LINE_SIZE];
-                snprintf(buffer,
-                    INI_MAX_LINE_SIZE,
-                    "Failed to add section '%s' to database. Possibly insufficient allocation space.",
-                    dest_section.name);
-                set_parse_error_(error, line, discrepancy_offset, buffer);
-                return NULL;
+                current_section = ini_add_section(data, dest_section.name);
+                if (!current_section)
+                {
+                    char buffer[INI_MAX_LINE_SIZE];
+                    snprintf(buffer,
+                        INI_MAX_LINE_SIZE,
+                        "Failed to add section '%s' to database. Possibly insufficient allocation space.",
+                        dest_section.name);
+                    set_parse_error_(error, line, discrepancy_offset, buffer);
+                    return NULL;
+                }
             }
         }
 
@@ -256,6 +269,10 @@ INIPair_t *ini_add_pair(const INIData_t *data, const char *section, const INIPai
 INIPair_t *ini_add_pair_to_section(INISection_t *section, const INIPair_t pair)
 {
     if (!section) return NULL;
+
+    for (size_t i = 0; i < section->pair_count; i++)
+        if (strcmp(section->pairs[i].key, pair.key) == 0)
+            section->pairs[i] = pair;
 
     if (section->pair_count >= section->pair_allocation)
     {

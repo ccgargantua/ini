@@ -10,7 +10,7 @@
 
 
 // If you don't want some nasty bugs, call these appropriately at the beginning
-// of each TEST
+// of each TEST that requires stack
 static void start_stack_use();
 static void end_stack_use();
 
@@ -31,7 +31,7 @@ TEST(ini_tests, file_parsing)
     fputs(contents, file);
     rewind(file);
     INIData_t *data = ini_create_data();
-    ASSERT_TRUE(ini_read_file(file, data, NULL) != NULL);
+    ASSERT_TRUE(ini_read_file(file, data, NULL, 0) != NULL);
     fclose(file);
     ASSERT_STREQ(ini_get_value(data, "Section1", "hello"), "world");
     ASSERT_TRUE(ini_get_bool(data, "Section2", "boolean", false));
@@ -42,7 +42,104 @@ TEST(ini_tests, file_parsing)
 
 
 
+TEST(ini_tests, file_parsing_erroroneous_pair)
+{
+    const char contents[] = "[Section1]\n"
+                            "erroneous line\n"
+                            "[Section2]\n"
+                            "boolean=true\n"
+                            "integer=5\n"
+                            "string=\"is a string\"\n"
+                            "float=1.0\n";
 
+    FILE *file = tmpfile();
+    assert(file);
+    fputs(contents, file);
+    rewind(file);
+    INIData_t *data = ini_create_data();
+    INIError_t error;
+    ASSERT_TRUE(ini_read_file(file, data, &error, 0) == NULL);
+    ASSERT_TRUE(error.encountered);
+    ASSERT_STREQ(error.line, "erroneous line\n");
+    fclose(file);
+    ini_free_data(data);
+}
+
+
+
+TEST(ini_tests, file_duplicate_section)
+{
+    const char contents[] = "[Section1]\n"
+                            "hello=world\n"
+                            "[Section2]\n"
+                            "boolean=true\n"
+                            "integer=5\n"
+                            "string=\"is a string\"\n"
+                            "[Section1]\n"
+                            "float=1.0\n";
+
+    FILE *file = tmpfile();
+    assert(file);
+    fputs(contents, file);
+    rewind(file);
+    INIData_t *data = ini_create_data();
+    INIError_t error;
+    ASSERT_TRUE(ini_read_file(file, data, &error, 0) == NULL);
+    ASSERT_TRUE(error.encountered);
+    ASSERT_STREQ(error.line, "[Section1]\n");
+    ini_free_data(data);}
+
+
+
+TEST(ini_tests, file_parsing_past_error)
+{
+    const char contents[] = "[Section1]\n"
+                            "erroneous line\n"
+                            "[Section2]\n"
+                            "boolean=true\n"
+                            "integer=5\n"
+                            "string=\"oops, no closing quotes!\n"
+                            "[Section1]\n"
+                            "float=1.0\n";
+
+    FILE *file = tmpfile();
+    assert(file);
+    fputs(contents, file);
+    rewind(file);
+    INIData_t *data = ini_create_data();
+    ASSERT_TRUE(ini_read_file(file, data, NULL, INI_CONTINUE_PAST_ERROR) != NULL);
+    fclose(file);
+    ASSERT_TRUE(ini_get_bool(data, "Section2", "boolean", false));
+    ASSERT_EQ(ini_get_signed(data, "Section2", "integer", 0), 5);
+    ASSERT_EQ(ini_get_float(data, "Section1", "float", INFINITY), 1.0f);
+    ini_free_data(data);
+}
+
+
+
+TEST(ini_tests, file_parsing_allow_duplicate_sections)
+{
+    const char contents[] = "[Section1]\n"
+                            "hello=world\n"
+                            "[Section2]\n"
+                            "boolean=true\n"
+                            "integer=5\n"
+                            "string=\"is a string\"\n"
+                            "[Section1]\n"
+                            "float=1.0\n";
+
+    FILE *file = tmpfile();
+    assert(file);
+    fputs(contents, file);
+    rewind(file);
+    INIData_t *data = ini_create_data();
+    ASSERT_TRUE(ini_read_file(file, data, NULL, INI_CONTINUE_PAST_ERROR) != NULL);
+    fclose(file);
+    ASSERT_TRUE(ini_get_bool(data, "Section2", "boolean", false));
+    ASSERT_EQ(ini_get_signed(data, "Section2", "integer", 0), 5);
+    ASSERT_EQ(ini_get_float(data, "Section1", "float", INFINITY), 1.0f);
+    ini_free_data(data);
+}
 
 
 
@@ -61,14 +158,14 @@ TEST(ini_tests, file_writing)
     rewind(input_file);
 
     INIData_t *data = ini_create_data();
-    ini_read_file(input_file, data, NULL);
+    ini_read_file(input_file, data, NULL, 0);
 
     FILE *output_file = tmpfile();
     ini_write_file(output_file, data);
     rewind(output_file);
 
     INIData_t *copy = ini_create_data();
-    ini_read_file(output_file, copy, NULL);
+    ini_read_file(output_file, copy, NULL, 0);
     ASSERT_TRUE(copy != NULL);
     ASSERT_TRUE(copy->sections != NULL);
     ASSERT_EQ(data->section_count, copy->section_count);
@@ -91,6 +188,8 @@ TEST(ini_tests, file_writing)
     fclose(input_file);
     fclose(output_file);
 }
+
+
 
 TEST(ini_tests, stack)
 {
@@ -116,7 +215,7 @@ TEST(ini_tests, stack)
     INIData_t ini;
     ini_init_data(&ini, sections, row_ptrs, max_sections, max_pairs);
 
-    ASSERT_TRUE(ini_read_file(file, &ini, NULL) != NULL);
+    ASSERT_TRUE(ini_read_file(file, &ini, NULL, 0) != NULL);
     fclose(file);
 
     ASSERT_STREQ(ini_get_string(&ini, "Section", "key", ""), "value");
@@ -150,7 +249,7 @@ TEST(ini_tests, stack_insufficient_pair_allocation)
     INIData_t ini;
     ini_init_data(&ini, sections, row_ptrs, max_sections, max_pairs);
 
-    ASSERT_TRUE(ini_read_file(file, &ini, NULL) == NULL);
+    ASSERT_TRUE(ini_read_file(file, &ini, NULL, 0) == NULL);
     fclose(file);
 
     end_stack_use();
@@ -181,7 +280,7 @@ TEST(ini_tests, stack_insufficient_section_allocation)
     INIData_t ini;
     ini_init_data(&ini, sections, row_ptrs, max_sections, max_pairs);
 
-    ASSERT_TRUE(ini_read_file(file, &ini, NULL) == NULL);
+    ASSERT_TRUE(ini_read_file(file, &ini, NULL, 0) == NULL);
     fclose(file);
 
     end_stack_use();

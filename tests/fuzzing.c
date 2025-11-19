@@ -6,7 +6,7 @@
 TEST(fuzzing, file_parse_invalid_path)
 {
     INIData_t data;
-    ASSERT_TRUE(ini_read_file_path("./does/not/exist.nope", &data, NULL) == NULL);
+    ASSERT_TRUE(ini_read_file_path("./does/not/exist.nope", &data, NULL, 0) == NULL);
 }
 
 
@@ -14,7 +14,7 @@ TEST(fuzzing, file_parse_invalid_path)
 TEST(fuzzing, file_parse_null_data)
 {
     FILE *fp = tmpfile();
-    ASSERT_TRUE(ini_read_file(fp, NULL, NULL) == NULL);
+    ASSERT_TRUE(ini_read_file(fp, NULL, NULL, 0) == NULL);
     fclose(fp);
 }
 
