@@ -48,6 +48,7 @@ TEST(fuzzing, add_section_long_name)
     const INISection_t *sp = ini_add_section(data, section);
     ASSERT_TRUE(sp != NULL);
     ASSERT_EQ(strlen(sp->name), INI_MAX_STRING_SIZE-1);
+    ini_free_data(data);
 }
 
 

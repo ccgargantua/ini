@@ -87,31 +87,6 @@ TEST(ini_tests, file_duplicate_section)
     ASSERT_TRUE(ini_read_file(file, data, &error, 0) == NULL);
     ASSERT_TRUE(error.encountered);
     ASSERT_STREQ(error.line, "[Section1]\n");
-    ini_free_data(data);}
-
-
-
-TEST(ini_tests, file_parsing_past_error)
-{
-    const char contents[] = "[Section1]\n"
-                            "erroneous line\n"
-                            "[Section2]\n"
-                            "boolean=true\n"
-                            "integer=5\n"
-                            "string=\"oops, no closing quotes!\n"
-                            "[Section1]\n"
-                            "float=1.0\n";
-
-    FILE *file = tmpfile();
-    assert(file);
-    fputs(contents, file);
-    rewind(file);
-    INIData_t *data = ini_create_data();
-    ASSERT_TRUE(ini_read_file(file, data, NULL, INI_CONTINUE_PAST_ERROR) != NULL);
-    fclose(file);
-    ASSERT_TRUE(ini_get_bool(data, "Section2", "boolean", false));
-    ASSERT_EQ(ini_get_signed(data, "Section2", "integer", 0), 5);
-    ASSERT_EQ(ini_get_float(data, "Section1", "float", INFINITY), 1.0f);
     ini_free_data(data);
 }
 
@@ -125,6 +100,86 @@ TEST(ini_tests, file_parsing_allow_duplicate_sections)
                             "boolean=true\n"
                             "integer=5\n"
                             "string=\"is a string\"\n"
+                            "[Section1]\n"
+                            "float=1.0\n";
+
+    FILE *file = tmpfile();
+    assert(file);
+    fputs(contents, file);
+    rewind(file);
+    INIData_t *data = ini_create_data();
+    ASSERT_TRUE(ini_read_file(file, data, NULL, INI_ALLOW_DUPLICATE_SECTIONS) != NULL);
+    fclose(file);
+    ASSERT_TRUE(ini_get_bool(data, "Section2", "boolean", false));
+    ASSERT_EQ(ini_get_signed(data, "Section2", "integer", 0), 5);
+    ASSERT_EQ(ini_get_float(data, "Section1", "float", INFINITY), 1.0f);
+    ini_free_data(data);
+}
+
+
+
+TEST(ini_tests, file_parsing_duplicate_keys_overwrite)
+{
+    const char contents[] = "[Section1]\n"
+                            "hello=world\n"
+                            "[Section2]\n"
+                            "boolean=true\n"
+                            "integer=5\n"
+                            "string=\"is a string\"\n"
+                            "string=\"is a duplicate\"\n"
+                            "float=1.0\n";
+
+    FILE *file = tmpfile();
+    assert(file);
+    fputs(contents, file);
+    rewind(file);
+    INIData_t *data = ini_create_data();
+    INIError_t error;
+    ASSERT_TRUE(ini_read_file(file, data, &error, INI_ALLOW_DUPLICATE_SECTIONS) == NULL);
+    fclose(file);
+    ASSERT_TRUE(error.encountered);
+    ASSERT_STREQ(error.line, "string=\"is a duplicate\"\n");
+    ini_free_data(data);
+}
+
+
+
+TEST(ini_tests, file_parsing_allow_duplicate_keys)
+{
+    const char contents[] = "[Section1]\n"
+                            "hello=world\n"
+                            "[Section2]\n"
+                            "boolean=true\n"
+                            "integer=5\n"
+                            "string=\"is a string\"\n"
+                            "string=\"is a duplicate\"\n"
+                            "float=1.0\n";
+
+    FILE *file = tmpfile();
+    assert(file);
+    fputs(contents, file);
+    rewind(file);
+    INIData_t *data = ini_create_data();
+    ASSERT_TRUE(ini_read_file(file, data, NULL, INI_DUPLICATE_KEYS_OVERWRITE) != NULL);
+    fclose(file);
+    ASSERT_TRUE(ini_get_bool(data, "Section2", "boolean", false));
+    ASSERT_EQ(ini_get_signed(data, "Section2", "integer", 0), 5);
+    ASSERT_EQ(ini_get_float(data, "Section2", "float", INFINITY), 1.0f);
+    ASSERT_STREQ(ini_get_string(data, "Section2", "string", ""), "is a duplicate");
+    ini_free_data(data);
+}
+
+
+
+TEST(ini_tests, file_parsing_past_error)
+{
+    const char contents[] = "[Section1]\n"
+                            "erroneous line\n"
+                            "[Section2]\n"
+                            "boolean=true\n"
+                            "integer=5\n"
+                            "string=\"oops, no closing quotes!\n"
+                            "string=\"is a duplicate\"\n"
                             "[Section1]\n"
                             "float=1.0\n";
 

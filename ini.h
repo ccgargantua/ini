@@ -61,7 +61,7 @@ void               ini_set_reallocator     (void*(*)(void*,    size_t));
 INIData_t         *ini_read_file_path      (const char*,       INIData_t*,       INIError_t*, uint64_t);
 INIData_t         *ini_read_file_pointer   (FILE*,             INIData_t*,       INIError_t*, uint64_t);
 void               ini_write_file_path     (const char*,       const INIData_t*);
-void               ini_write_file_pointer  (FILE*, const INIData_t*);
+void               ini_write_file_pointer  (FILE*,             const INIData_t*);
 
 // Database insertion
 INISection_t      *ini_add_section         (INIData_t*,        const char*);
@@ -152,6 +152,7 @@ void               ini_init_data           (INIData_t*,        INISection_t*,   
 
 #define INI_CONTINUE_PAST_ERROR      (1ull << 0)
 #define INI_ALLOW_DUPLICATE_SECTIONS (1ull << 1)
+#define INI_DUPLICATE_KEYS_OVERWRITE (1ull << 2)
 
 
 

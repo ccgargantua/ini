@@ -15,6 +15,7 @@ TEST(queries, add_section)
     const INISection_t *section = ini_add_section(data, "section");
     ASSERT_TRUE(section != NULL);
     ASSERT_TRUE(section == ini_has_section(data, "section"));
+    ini_free_data(data);
 }
 
 

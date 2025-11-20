@@ -137,6 +137,20 @@ INIData_t *ini_read_file_pointer(FILE *file, INIData_t *data, INIError_t *error,
                 return NULL;
             }
 
+            for (size_t i = 0; i < current_section->pair_count; i++)
+                if (strcmp(current_section->pairs[i].key, pair.key) == 0)
+                {
+                    if (flags & INI_DUPLICATE_KEYS_OVERWRITE)
+                        current_section->pairs[i] = pair;
+                    else if (flags & INI_CONTINUE_PAST_ERROR)
+                        continue;
+                    else
+                    {
+                        set_parse_error_(error, line, 0, "Duplicate key in section.");
+                        return NULL;
+                    }
+                }
+
             if (!ini_add_pair_to_section(current_section, pair))
             {
                 if (flags & INI_CONTINUE_PAST_ERROR) continue;
@@ -269,10 +283,6 @@ INIPair_t *ini_add_pair(const INIData_t *data, const char *section, const INIPai
 INIPair_t *ini_add_pair_to_section(INISection_t *section, const INIPair_t pair)
 {
     if (!section) return NULL;
-
-    for (size_t i = 0; i < section->pair_count; i++)
-        if (strcmp(section->pairs[i].key, pair.key) == 0)
-            section->pairs[i] = pair;
 
     if (section->pair_count >= section->pair_allocation)
     {
