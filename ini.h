@@ -1,736 +1,275 @@
 #ifndef INI_H
 #define INI_H
 
-
-
-/*
- *   MIT License
+/**
+ * MIT License
  *
- *   Copyright (c) 2025 Carter Dugan
+ * Copyright (c) 2025 Carter Dugan
  *
- *   Permission is hereby granted, free of charge, to any person obtaining a copy
- *   of this software and associated documentation files (the "Software"), to deal
- *   in the Software without restriction, including without limitation the rights
- *   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *   copies of the Software, and to permit persons to whom the Software is
- *   furnished to do so, subject to the following conditions:
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *   The above copyright notice and this permission notice shall be included in all
- *   copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
  *
- *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *   SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
-
- 
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 
-
-
 //////////////////////////
 // Forward Declarations //
 //////////////////////////
 
-/* Structs */
-
+/** Represents a key=value pair in an INI file */
 typedef struct INIPair_t    INIPair_t;
+
+/** Represents a [section] in an INI file */
 typedef struct INISection_t INISection_t;
+
+/** Represents the full parsed INI data */
 typedef struct INIData_t    INIData_t;
+
+/** Represents error information encountered during parsing */
 typedef struct INIError_t   INIError_t;
 
+/////////////////
+// Internals  //
+/////////////////
 
-
-/* Functions */
-
-// Internals
-void               ini_disable_heap        (void);
-void               ini_set_allocator       (void*(*)(size_t));
-void               ini_set_free            (void(*)(void*));
-void               ini_set_reallocator     (void*(*)(void*,    size_t));
-
-// File I/O
-INIData_t         *ini_read_file_path      (const char*,       INIData_t*,       INIError_t*, uint64_t);
-INIData_t         *ini_read_file_pointer   (FILE*,             INIData_t*,       INIError_t*, uint64_t);
-void               ini_write_file_path     (const char*,       const INIData_t*);
-void               ini_write_file_pointer  (FILE*,             const INIData_t*);
-
-// Database insertion
-INISection_t      *ini_add_section         (INIData_t*,        const char*);
-INIPair_t         *ini_add_pair            (const INIData_t*,  const char*,      INIPair_t);
-INIPair_t         *ini_add_pair_to_section (INISection_t *,    INIPair_t);
-
-// Database query
-INISection_t      *ini_has_section         (const INIData_t*,  const char*);
-const char        *ini_get_value           (const INIData_t*,  const char*,      const char*);
-const char        *ini_get_string          (const INIData_t*,  const char*,      const char*, const char*);
-unsigned long long ini_get_unsigned        (const INIData_t*,  const char*,      const char*, unsigned long long);
-long long          ini_get_signed          (const INIData_t*,  const char*,      const char*, long long);
-unsigned long long ini_get_hex             (const INIData_t*,  const char*,      const char*, unsigned long long);
-long double        ini_get_float           (const INIData_t*,  const char*,      const char*, long double);
-bool               ini_get_bool            (const INIData_t*,  const char*,      const char*, bool);
-
-// Parsing
-bool               ini_is_blank_line       (const char*);
-bool               ini_parse_section       (const char*,       INISection_t*,    ptrdiff_t*);
-bool               ini_parse_pair          (const char*,       INIPair_t*,       ptrdiff_t*);
-bool               ini_parse_key           (const char*,       char*,            unsigned,    ptrdiff_t*);
-bool               ini_parse_value         (const char*,       char*,            unsigned,    ptrdiff_t*);
-
-// Heap
-INIData_t         *ini_create_data         (void);
-void               ini_free_data           (INIData_t*);
-
-// Stack
-void               ini_init_data           (INIData_t*,        INISection_t*,    INIPair_t**, unsigned, unsigned);
-
-
-
-//////////////
-//  MACROS  //
-//////////////
-
-
-
-// You can redefine these without issue.
-
-#ifndef INI_MAX_STRING_SIZE
-    #define INI_MAX_STRING_SIZE 256
-#endif
-#ifndef INI_MAX_LINE_SIZE
-    #define INI_MAX_LINE_SIZE 1024
-#endif
-
-
-
-#ifndef INI_DEFAULT_ALLOC
-    #define INI_DEFAULT_ALLOC malloc
-#endif
-#ifndef INI_DEFAULT_FREE
-    #define INI_DEFAULT_FREE free
-#endif
-#ifndef INI_DEFAULT_REALLOC
-    #define INI_DEFAULT_REALLOC realloc
-#endif
-
-
-
-#ifndef INI_INITIAL_ALLOCATED_PAIRS
-    #define INI_INITIAL_ALLOCATED_PAIRS 32
-#endif
-#ifndef INI_INITIAL_ALLOCATED_SECTIONS
-    #define INI_INITIAL_ALLOCATED_SECTIONS 8
-#endif
-
-
-
-// I strongly advise against changing these
-
-#define ini_read_file(T,data,error,flags) _Generic((T), \
-    const char*: ini_read_file_path,              \
-    char*:       ini_read_file_path,              \
-    FILE*:       ini_read_file_pointer            \
-)(T,data,error,flags)
-
-#define ini_write_file(T,data) _Generic((T), \
-    const char*: ini_write_file_path,              \
-    char*:       ini_write_file_path,              \
-    FILE*:       ini_write_file_pointer            \
-)(T,data)
-
-
-
-// File parsing flags
-
-#define INI_CONTINUE_PAST_ERROR      (1ull << 0)
-#define INI_ALLOW_DUPLICATE_SECTIONS (1ull << 1)
-#define INI_DUPLICATE_KEYS_OVERWRITE (1ull << 2)
-
-
-
-////////////////////////
-// Struct Definitions //
-////////////////////////
-
-/*
- * Key=value pair
- */
-struct INIPair_t
-{
-    char key[INI_MAX_STRING_SIZE];
-    char value[INI_MAX_STRING_SIZE];
-};
-
-
-
-/*
- * [Section]
- *
- * Keeps track of encapsulated pairs, the number of pairs,
- * and the number of allocated pairs.
- */
-struct INISection_t
-{
-    // Name of the section, excluding the encapsulating
-    // [ ] characters
-    char name[INI_MAX_STRING_SIZE];
-
-    // Pointer to pairs
-    INIPair_t *pairs;
-    unsigned pair_count;
-
-    // Number of allocated pairs
-    // >= pair_count
-    unsigned pair_allocation;
-};
-
-
-
-/*
- * Data structure for INI contents. Keeps track of
- * sections and the number of sections.
- */
-struct INIData_t
-{
-
-    // Pointer to sections
-    INISection_t *sections;
-    unsigned section_count;
-
-    // Number of allocated sections
-    // >= section_count
-    unsigned section_allocation;
-};
-
-
-
-/*
- * A container for the parsing error information.
- */
-struct INIError_t
-{
-    // Set if an error is encountered during parsing
-    bool encountered;
-
-    // A message describing the error
-    char msg[INI_MAX_LINE_SIZE];
-
-    // The culprit line
-    char line[INI_MAX_LINE_SIZE];
-
-    // The offset of the invalid character if encountered.
-    ptrdiff_t offset;
-};
-
-
-
-///////////////////////////
-// Function Declarations //
-///////////////////////////
-
-/*
- *  Disable internal calls to heap allocation functions,
- *  which by default are malloc, realloc, and free. If
- *  you use this, then all attempted heap calls are
- *  treated as failures and must be handled accordingly.
- *
- *  See examples/stack/ to see an example of using the library
- *  without the heap.
+/**
+ * Disables all internal heap allocations.
+ * Any allocation attempts will fail.
  */
 void ini_disable_heap(void);
 
-
-
-/*
- *  Set the allocator to be used internally by ini. If you
- *  set this, you almost *certainly* want to also set the
- *  reallocator and deallocator.
+/**
+ * Sets a custom allocator function.
  *
- *  Params:
- *    allocator - malloc-like allocator
+ * @param allocator malloc-like allocator
  */
-void ini_set_allocator(void *(*allocator) (size_t));
+void ini_set_allocator(void *(*)(size_t));
 
-
-
-/*
- *  Set the deallocator to be used internally by ini. If you
- *  set this, you almost *certainly* want to also set the
- *  reallocator and allocator.
+/**
+ * Sets a custom deallocator function.
  *
- *  Params:
- *    deallocator - free-like deallocator
+ * @param deallocator free-like deallocator
  */
-void ini_set_free(void (*deallocator) (void*));
+void ini_set_free(void (*)(void*));
 
-
-
-/*
- *  Set the reallocator to be used internally by ini. If you
- *  set this, you almost *certainly* want to also set the
- *  allocator and deallocator.
+/**
+ * Sets a custom reallocator function.
  *
- *  Params:
- *    reallocator - realloc-like reallocator
+ * @param reallocator realloc-like reallocator
  */
-void ini_set_reallocator(void *(*reallocator) (void*,size_t));
+void ini_set_reallocator(void *(*)(void*, size_t));
 
+//////////////
+// File I/O //
+//////////////
 
-
-/*
- * Parse an ini file and populate a data structure
- * with contents. User will need to free the returned
- * object on their own later on with a call to ini_free()
+/**
+ * Reads and parses an INI file from a file path.
  *
- * Params:
- *   file   - File path to parse
- *   data   - The database object to be filled with ini
- *            contents.
- *   buffer - Line buffer to store erroneous line. Must be
- *   flags  - Bit-aligned flags to control behavior of the
- *            file parser. See the flag macros
- *
- *
- * Returns:
- *   A pointer to data on success, or NULL on failure.
+ * @param path  Path to the INI file
+ * @param data  Destination INIData_t
+ * @param error Error output container
+ * @param flags Parsing flags
+ * @return Pointer to populated INIData_t or NULL on failure
  */
-INIData_t *ini_read_file_path(const char *path, INIData_t *data, INIError_t *error, uint64_t flags);
+INIData_t *ini_read_file_path(const char*, INIData_t*, INIError_t*, uint64_t);
 
-
-/*
- * Parse an ini file and populate a data structure
- * with contents. User will need to free the returned
- * object on their own later on with a call to ini_free()
+/**
+ * Reads and parses an INI file from a FILE pointer.
  *
- * Params:
- *   file   - File pointer to parse
- *   data   - The database object to be filled with ini
- *            contents. Must be a valid pointer.
- *   error  - Pointer to error object to keep track of
- *            erroneous character offset and store error
- *            message
- *   flags  - Bit-aligned flags to control behavior of the
- *            file parser. See the flag macros
- *
- *
- * Returns:
- *   A pointer to data on success, or NULL on failure.
+ * @param file  File pointer
+ * @param data  Destination INIData_t
+ * @param error Error output container
+ * @param flags Parsing flags
+ * @return Pointer to populated INIData_t or NULL on failure
  */
-INIData_t *ini_read_file_pointer(FILE *file, INIData_t *data, INIError_t *error, uint64_t flags);
+INIData_t *ini_read_file_pointer(FILE*, INIData_t*, INIError_t*, uint64_t);
 
-
-
-/*
- * Use the contents of an INIData_t object to generate an
- * INI file (or overwrite an existing one)
+/**
+ * Writes INI data to a file path.
  *
- * Params:
- *   file - Destination file path.
- *   data - A pointer to the INIData_t object whose data
- *          you would like to write
+ * @param path Output file path
+ * @param data INI data to write
  */
-void ini_write_file_path(const char *path, const INIData_t *data);
+void ini_write_file_path(const char*, const INIData_t*);
 
-
-/*
- * Use the contents of an INIData_t object to generate an
- * INI file (or overwrite an existing one)
+/**
+ * Writes INI data to a FILE pointer.
  *
- * Params:
- *   file - Destination file pointer.
- *   data - A pointer to the INIData_t object whose data
- *          you would like to write
+ * @param file Output file pointer
+ * @param data INI data to write
  */
-void ini_write_file_pointer(FILE *file, const INIData_t *data);
+void ini_write_file_pointer(FILE*, const INIData_t*);
 
+////////////////////////
+// Database Insertion //
+////////////////////////
 
-/*
- * Add a section to an INIData_t object by providing the name
- * of the new section. This internally will call ini_section_init()
- * (see above).
+/**
+ * Adds a new section to the INI data.
  *
- * Param:
- *   data - The INIData_t object that will acquire the new section.
- *   name - The name of the section to be added.
- *
- * Returns:
- *   A pointer to the newly-added section, or NULL on error or
- *   if the section already exists.
- *
- *   If you have opted to use heap allocations, then this
- *   allocates space for the new heap. Otherwise it will return
- *   a pointer to the newly initialized section.
+ * @param data INIData_t container
+ * @param name Section name
+ * @return Pointer to new section or NULL on failure
  */
-INISection_t *ini_add_section(INIData_t *data, const char *name);
+INISection_t *ini_add_section(INIData_t*, const char*);
 
-
-
-/*
- * Add a pair to an INIData_t object by providing the section
- * name and indirectly adding it to the section.
+/**
+ * Adds a key=value pair to a section by name.
  *
- * Param:
- *   data    - The INIData_t object to add the pair to. Must be
- *             a valid pointer
- *   section - The **name** of the section to add the pair
- *             to. Assumed to be null-terminated.
- *   pair    - The pair to be added. Assumed that both internal
- *             strings for key and value are null-terminated.
- *
- * Return:
- *   A pointer to the pair after being added to the proper
- *   section within `data`, or NULL on failure (i.e., providing
- *   a name for a section that does not exist in `data`)
+ * @param data    INIData_t container
+ * @param section Section name
+ * @param pair    Pair to insert
+ * @return Pointer to inserted pair or NULL on failure
  */
-INIPair_t *ini_add_pair(const INIData_t *data, const char *section, INIPair_t pair);
+INIPair_t *ini_add_pair(const INIData_t*, const char*, INIPair_t);
 
-
-
-/*
- * Add a pair directly to a section, agnostic to the parent
- * INIData_t object.
+/**
+ * Adds a key=value pair directly to a section.
  *
- * Param:
- *   section - The section to acquire the pair.
- *   pair    - A pair object whose data will be copied into
- *             a new pair in the section.
- *
- * Returns:
- *   A pointer to the newly-added pair within the section.
+ * @param section Target section
+ * @param pair    Pair to insert
+ * @return Pointer to inserted pair
  */
-INIPair_t *ini_add_pair_to_section(INISection_t *section, INIPair_t pair);
+INIPair_t *ini_add_pair_to_section(INISection_t*, INIPair_t);
 
+////////////////////
+// Database Query //
+////////////////////
 
-
-/*
- * Query for a section object based on the section name.
+/**
+ * Checks if a section exists.
  *
- * Params:
- *   data    - The INIData_t object that represents an INI file.
- *   section - The name of the section you are checking for.
- *
- * Returns:
- *   A pointer to the located INISection_t object, or NULL if
- *   the section is not found.
+ * @param data    INIData_t container
+ * @param section Section name
+ * @return Pointer to section or NULL if not found
  */
-INISection_t *ini_has_section(const INIData_t *data, const char *section);
+INISection_t *ini_has_section(const INIData_t*, const char*);
 
-
-
-/*
- * Retrieve a value from an INIData_t object given a section
- * name and a key value.
+/**
+ * Retrieves a value string by section and key.
  *
- * Params:
- *   data    - The INIData_t object to be searched.
- *   section - The section string to search for.
- *   key     - The key string to search for.
- *
- * Returns:
- *   The value in the form of a null-terminated C-string, or
- *   NULL if not found.
+ * @param data    INIData_t container
+ * @param section Section name
+ * @param key     Key name
+ * @return Value string or NULL
  */
-const char *ini_get_value(const INIData_t *data, const char *section, const char *key);
+const char *ini_get_value(const INIData_t*, const char*, const char*);
 
-
-
-/*
- * Attempt to fetch an string value from INI data given a
- * section and key. If unfound, returns a provided default.
- *
- * Params:
- *   data    - Pointer to the INIData_t object to search
- *   section - The section title being searched for.
- *   key     - The key being searched for.
- *   default - Default value to be used if searched
- *             value is not found or fails to be parsed.
- *
- * Returns:
- *   As said above, returns the searched value or the provided
- *   default if the searched value could not be found or parsing
- *   failed.
+/**
+ * Retrieves a string value or default.
  */
-const char *ini_get_string(const INIData_t *data, const char *section, const char *key, const char *default_value);
+const char *ini_get_string(const INIData_t*, const char*, const char*, const char*);
 
-
-
-/*
- * Attempt to fetch an unsigned integer value from INI data given a
- * section and key. If unfound, returns a provided default.
- *
- * Params:
- *   data    - Pointer to the INIData_t object to search
- *   section - The section title being searched for.
- *   key     - The key being searched for.
- *   default - Default value to be used if searched
- *             value is not found or fails to be parsed.
- *
- * Returns:
- *   As said above, returns the searched value or the provided
- *   default if the searched value could not be found or parsing
- *   failed.
+/**
+ * Retrieves an unsigned integer value or default.
  */
-unsigned long long ini_get_unsigned(const INIData_t *data, const char *section, const char *key, unsigned long long default_value);
+unsigned long long ini_get_unsigned(const INIData_t*, const char*, const char*, unsigned long long);
 
-
-
-/*
- * Attempt to fetch a signed integer value from INI data given a
- * section and key. If unfound, returns a provided default.
- *
- * Params:
- *   data    - Pointer to the INIData_t object to search
- *   section - The section title being searched for.
- *   key     - The key being searched for.
- *   default - Default value to be used if searched
- *             value is not found or fails to be parsed.
- *
- * Returns:
- *   As said above, returns the searched value or the provided
- *   default if the searched value could not be found or parsing
- *   failed.
+/**
+ * Retrieves a signed integer value or default.
  */
-long long ini_get_signed(const INIData_t *data, const char *section, const char *key, long long default_value);
+long long ini_get_signed(const INIData_t*, const char*, const char*, long long);
 
-
-
-/*
- * Attempt to fetch an unsigned base-16 hex value from INI data given a
- * section and key. If unfound, returns a provided default.
- *
- * Params:
- *   data    - Pointer to the INIData_t object to search
- *   section - The section title being searched for.
- *   key     - The key being searched for.
- *   default - Default value to be used if searched
- *             value is not found or fails to be parsed.
- *
- * Returns:
- *   As said above, returns the searched value or the provided
- *   default if the searched value could not be found or parsing
- *   failed.
+/**
+ * Retrieves a hexadecimal value or default.
  */
-unsigned long long ini_get_hex(const INIData_t *data, const char *section, const char *key, unsigned long long default_value);
+unsigned long long ini_get_hex(const INIData_t*, const char*, const char*, unsigned long long);
 
-
-
-/*
- * Attempt to fetch an floating point value from INI data given a
- * section and key. If unfound, returns a provided default.
- *
- * Params:
- *   data    - Pointer to the INIData_t object to search
- *   section - The section title being searched for.
- *   key     - The key being searched for.
- *   default - Default value to be used if searched
- *             value is not found or fails to be parsed.
- *
- * Returns:
- *   As said above, returns the searched value or the provided
- *   default if the searched value could not be found or parsing
- *   failed.
+/**
+ * Retrieves a floating-point value or default.
  */
-long double ini_get_float(const INIData_t *data, const char *section, const char *key, long double default_value);
+long double ini_get_float(const INIData_t*, const char*, const char*, long double);
 
-
-
-/*
- * Attempt to fetch an boolean from INI data given a section
- * and key. If unfound, returns a provided default.
- *
- * Params:
- *   data    - Pointer to the INIData_t object to search
- *   section - The section title being searched for.
- *   key     - The key being searched for.
- *   default - Default value to be used if searched
- *             value is not found or fails to be parsed.
- *
- * Returns:
- *   As said above, returns the searched value or the provided
- *   default if the searched value could not be found or parsing
- *   failed.
+/**
+ * Retrieves a boolean value or default.
  */
-bool ini_get_bool(const INIData_t *data, const char *section, const char *key, bool default_value);
+bool ini_get_bool(const INIData_t*, const char*, const char*, bool);
 
+/////////////
+// Parsing //
+/////////////
 
-
-/*
- * A helper function that parses a character array and
- * determines if the array represents a blank line via
- * INI syntax rules (contains only whitespace or comments)
- *
- * Params:
- *   line - The character array to be parsed. Assumed
- *          to be null-terminated.
- *
- * Returns:
- *   True if the line is considered blank, false
- *   otherwise.
+/**
+ * Determines whether a line is blank or a comment.
  */
-bool ini_is_blank_line(const char *line);
+bool ini_is_blank_line(const char*);
 
-
-
-/*
- * A helper function that parses a character array and
- * attempts to parse a valid section.
- *
- * Params:
- *   line         - The character array to be parsed. Assumed
- *                  to be null-terminated.
- *   section      - A pointer to a destination section to
- *                  store name strings. If NULL is provided,
- *                  has no effect. If a string is not a valid
- *                  section, then the name string is zero-length
- *                  and null-terminated.
- *   discrepancy  - A pointer to an integer representing the
- *                  offset of the erroneous character if
- *                  present. If no error found, will be given
- *                  0. If NULL, has no effect.
- *
- * Returns:
- *   True if the line is considered a valid section,
- *   false otherwise or on failure.
+/**
+ * Attempts to parse a section header.
  */
-bool ini_parse_section(const char *line, INISection_t *section, ptrdiff_t *discrepancy);
+bool ini_parse_section(const char*, INISection_t*, ptrdiff_t*);
 
-
-
-/*
- * A helper function that reads a character array and
- * attempts to parse a valid pair.
- *
- * Params:
- *   line         - The character array to be parsed. Assumed to be
- *                  null-terminated.
- *   pair         - A pointer to a destination pair to store
- *                  key and value strings. If NULL is provided,
- *                  has no effect. If a string is not a valid
- *                  pair, then the key and value strings are
- *                  zero-length and null-terminated.
- *   discrepancy  - A pointer to an integer representing the
- *                  offset of the erroneous character if
- *                  present. If no error found, will be given
- *                  0. If NULL, has no effect.
- *
- * Returns:
- *   True if the line is considered a legal k=v pair,
- *   false otherwise or on failure.
+/**
+ * Attempts to parse a key=value pair.
  */
-bool ini_parse_pair(const char *line, INIPair_t *pair, ptrdiff_t *discrepancy);
+bool ini_parse_pair(const char*, INIPair_t*, ptrdiff_t*);
 
-
-
-/*
- * A helper function that parses a character array and
- * attempts to parse a valid key.
- *
- * Params:
- *   line         - The character array to be parsed. Assumed
- *                  to be null-terminated.
- *   dest         - A pointer to a destination buffer to
- *                  store key string. If NULL is provided,
- *                  has no effect. If a string is not a valid
- *                  section, then the string is invalid and
- *                  not guaranteed to be null-terminated.
- *   n            - The size of the destination buffer. Assumed
- *                  to be accurate.
- *   discrepancy  - A pointer to an integer representing the
- *                  offset of the erroneous character if
- *                  present. If no error found, will be given
- *                  0. If NULL, has no effect.
- *
- * Returns:
- *   True if the line is considered a valid key, false
- *   otherwise or on failure.
+/**
+ * Attempts to parse a key string.
  */
-bool ini_parse_key(const char *line, char *dest, unsigned n, ptrdiff_t *discrepancy);
+bool ini_parse_key(const char*, char*, unsigned, ptrdiff_t*);
 
-
-
-/*
- * A helper function that parses a character array and
- * attempts to parse a valid value.
- *
- * Params:
- *   line         - The character array to be parsed.
- *   dest         - A pointer to a destination buffer to
- *                  store value string. If NULL is provided,
- *                  has no effect. If a string is not a valid
- *                  section, then the string is invalid and
- *                  not guaranteed to be null-terminated.
- *   n            - The size of the destination buffer. Assumed
- *                  to be accurate.
- *   discrepancy  - A pointer to an integer representing the
- *                  offset of the erroneous character if
- *                  present. If no error found, will be given
- *                  0. If NULL, has no effect.
- *
- * Returns:
- *   True if the line is considered a valid value, false
- *   otherwise.
+/**
+ * Attempts to parse a value string.
  */
-bool ini_parse_value(const char *line, char *dest, unsigned n, ptrdiff_t *discrepancy);
+bool ini_parse_value(const char*, char*, unsigned, ptrdiff_t*);
 
+//////////
+// Heap //
+//////////
 
-
-/*
- * Create a heap-allocated INIData_t database object.
+/**
+ * Allocates and initializes a heap-based INIData_t object.
  *
- * Returns:
- *   Pointer to INIData_t object that must be free'd later
- *   with a call to ini_free_data(). Initial allocations
- *   comply with INI_INITIAL_ALLOCATED_PAIRS and
- *   INI_INITIAL_ALLOCATED_SECTIONS
+ * @return Pointer to new INIData_t
  */
-INIData_t *ini_create_data();
+INIData_t *ini_create_data(void);
 
-
-
-/*
- * Free the memory resources used by an INIData_t object.
- * This should be called if you have created an INIData_t
- * object with ini_create_data()
+/**
+ * Frees a heap-allocated INIData_t object.
  *
- * Params:
- *   data - The INIData_t object to be free'd.
+ * @param data INIData_t to free
  */
-void ini_free_data(INIData_t *data);
+void ini_free_data(INIData_t*);
 
+///////////
+// Stack //
+///////////
 
-
-/*
- * Initialize a data object with sections, initialize sections
- * with pairs. Useful for saving some time when working with
- * the stack. See examples.
+/**
+ * Initializes an INIData_t object using stack-allocated memory.
  *
- * Params
- *   data         - The INIData_t object to be initialized. Its section
- *                  count is set to zero, its section allocations set
- *                  to num_sections.
- *   sections    -  The sections to be initialized with pairs and given
- *                  to the data object. Its pair count is set to zero
- *                  and its pair allocations set to num_pair. Expected
- *                  to be of size num_sections
- *   pairs        - The pairs given to the section objects. Expected to
- *                  be a two-dimensional array of size
- *                  [num_sections][num_pairs]
- *   num_sections - The number of sections. Assumed to be the only dimension
- *                  of the sections array and the first dimension of the
- *                  pairs 2D array.
- *   num_pairs    - The number of pairs per section. Assumed to be the
- *                  second dimension of the pairs 2D array.
+ * @param data         INIData_t to initialize
+ * @param sections     Section array
+ * @param pairs        Pair arrays
+ * @param num_sections Number of sections
+ * @param num_pairs    Number of pairs per section
  */
-void ini_init_data(INIData_t* data, INISection_t* sections, INIPair_t** pairs, unsigned num_sections, unsigned num_pairs);
+void ini_init_data(
+    INIData_t* data,
+    INISection_t* sections,
+    INIPair_t** pairs,
+    unsigned num_sections,
+    unsigned num_pairs
+);
 
-
-
-#endif //INI_H
+#endif // INI_H
