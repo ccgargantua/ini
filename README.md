@@ -249,7 +249,19 @@ anything else, please don't make me change my mind on that :)
 Make sure all test cases pass under both debug and release. Ensure no
 memory is leaked. I will be running these tests if you open a PR. If
 they fail or a memory profiler screams about your code, I'm going
-to immediately close your pull request.
+to immediately close your pull request. I've made this easy for you
+with a `build.sh` build script. Here is your short usage guide:
+
+```bash
+bash build.sh -rt # build tests under release
+bash build.sh -r  # build library under release
+bash build.sh -t  # build tests under debug
+bash build.sh     # build library under debug
+```
+
+***If you make a low-effort contribution (issue, PR, anything)
+it will be ignored and you will be blocked. This includes obvious
+use of AI code generation.***
 
 ## Accreditations
 
